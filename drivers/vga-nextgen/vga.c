@@ -102,7 +102,7 @@ void __time_critical_func() dma_handler_VGA() {
             dma_channel_set_read_addr(dma_chan_ctrl, &lines_pattern[1], false); //VS SYNC
         else
             dma_channel_set_read_addr(dma_chan_ctrl, &lines_pattern[0], false);
-        return;
+        goto end_line;
     }
 
     if (!input_buffer) {
@@ -122,7 +122,7 @@ void __time_critical_func() dma_handler_VGA() {
         case VGA_320x200x256x4:
         case GRAPHICSMODE_DEFAULT:
         line_number = screen_line / 2;
-        if (screen_line % 3) return;
+        if (screen_line % 3) goto end_line;
         y = screen_line / 3 - graphics_buffer_shift_y;
             break;
 
@@ -175,17 +175,17 @@ void __time_critical_func() dma_handler_VGA() {
                 }
             }
             dma_channel_set_read_addr(dma_chan_ctrl, output_buffer, false);
-            return;
+            goto end_line;
         }
         default: {
             dma_channel_set_read_addr(dma_chan_ctrl, &lines_pattern[0], false); // TODO: ensue it is required
-            return;
+            goto end_line;
         }
     }
 
     if (y < 0) {
         dma_channel_set_read_addr(dma_chan_ctrl, &lines_pattern[0], false); // TODO: ensue it is required
-        return;
+        goto end_line;
     }
     if (y >= graphics_buffer_height) {
         // заполнение линии цветом фона
@@ -201,7 +201,7 @@ void __time_critical_func() dma_handler_VGA() {
             }
         }
         dma_channel_set_read_addr(dma_chan_ctrl, output_buffer, false);
-        return;
+        goto end_line;
     };
 
     //зона прорисовки изображения
@@ -245,7 +245,7 @@ void __time_critical_func() dma_handler_VGA() {
 
 
     int width = MIN((visible_line_size - ((graphics_buffer_shift_x > 0) ? (graphics_buffer_shift_x) : 0)), max_width);
-    // if (width < 0) return; // TODO: detect a case
+    // if (width < 0) goto end_line; // TODO: detect a case
 
     // Индекс палитры в зависимости от настроек чередования строк и кадров
     uint16_t* current_palette = palette[(y & is_flash_line) + (frame_number & is_flash_frame) & 1];
@@ -279,6 +279,8 @@ void __time_critical_func() dma_handler_VGA() {
             break;
     }
     dma_channel_set_read_addr(dma_chan_ctrl, output_buffer, false);
+end_line:
+    if (screen_line == N_lines_total - 1) handle_frame_changed();
 }
 
 void graphics_set_mode(enum graphics_mode_t mode) {
@@ -593,15 +595,4 @@ void graphics_init() {
 
     irq_set_enabled(VGA_DMA_IRQ, true);
     dma_start_channel_mask(1u << dma_chan);
-}
-
-
-void clrScr(const uint8_t color) {
-    if (!SELECT_VGA) {
-        clrScr_hdmi(color);
-        return;
-    }
-    uint16_t* t_buf = (uint16_t *)text_buffer;
-    int size = TEXTMODE_COLS * TEXTMODE_ROWS;
-    while (size--) *t_buf++ = color << 4 | ' ';
 }
