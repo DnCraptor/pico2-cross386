@@ -371,7 +371,7 @@ static i2s_config_t i2s_config = {
 };
     
 static semaphore vga_start_semaphore;
-static uint16_t SCREEN[TEXTMODE_ROWS][80];
+static u8 SCREEN[256l << 10]; // Emulate 256 KB of frame-buffer
 
 #ifdef HDMIA
 #define __dvi_func_x(f) __scratch_x(__STRING(f)) f
