@@ -23,6 +23,8 @@ typedef uint64_t u64;
 #define DX ((u16)(edx))
 #define DI ((u16)(edi))
 
+#define CF_ON (1 << 29)
+
 extern u16 X86_CS;
 extern u16 X86_DS;
 extern u16 X86_ES;
@@ -47,7 +49,7 @@ typedef struct chs_s {
     u16 pad;
 } chs_t;
 
-
+typedef struct FIL_s FIL;
 typedef struct drive_s {
     u8 type;            // Driver type (DTYPE_*)
     u8 floppy_type;     // Type of floppy (only for floppy drives).
@@ -62,6 +64,8 @@ typedef struct drive_s {
     chs_t pchs;         // Physical CHS
     u32 max_segment_size; //max_segment_size
     u32 max_segments;   //max_segments
+    // file pre-open for this drive
+    FIL* pf;
 } drive_t;
 
 #define DISK_SECTOR_SIZE  512
@@ -97,7 +101,7 @@ __attribute__((naked)) void x86_int10_hanler();
 __attribute__((naked)) void x86_int13_hanler();
 
 // x86 BIOS implementation
-u32 x86_int10_hanler_C(u32 eax) __attribute__((pcs("aapcs")));
+u32 x86_int10_hanler_C(u32 eax, u32 ebx, u32 ecx, u32 edx) __attribute__((pcs("aapcs")));
 u32 x86_int13_hanler_C(u32 eax, u32 ebx, u32 ecx, u32 edx) __attribute__((pcs("aapcs")));
 
 #ifdef __cplusplus

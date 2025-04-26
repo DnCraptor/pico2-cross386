@@ -1,12 +1,12 @@
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include <pico.h>
 #include <pico/stdlib.h>
 #include "ff.h"
 #include "x86.h"
 
 #include "graphics.h"
-void goutf(int outline, bool err, const char *__restrict str, ...);
 
 bool cd_card_mount = false;
 const char HOME_DIR[] = "/cross";
@@ -27,8 +27,6 @@ const char HOME_DIR[] = "/cross";
 #define DISK_RET_ETOOMANYLOCKS 0xb4 << 8
 #define DISK_RET_EMEDIA        0xC0 << 8
 #define DISK_RET_ENOTREADY     0xAA << 8
-
-#define CF_ON (1 << 29)
 
 static u32 last_op_res = DISK_RET_SUCCESS;
 
@@ -100,52 +98,52 @@ static drive_t hdds[4] = {
     {
         DTYPE_ATA,
         0,
-        {256, 1024, 64},
-        256 * 1024 * 64,
+        {256, 512, 63},
+        256 * 512 * 63,
         0,
         0,
         0,
         DISK_SECTOR_SIZE,
-        {256, 1024, 64},
+        {256, 512, 63},
         1ull << VIRTIO_BLK_F_SIZE_MAX,
         1ull << VIRTIO_BLK_F_SEG_MAX
     },
     {
         DTYPE_ATA,
         0,
-        {256, 1024, 64},
-        256 * 1024 * 64,
+        {256, 512, 63},
+        256 * 512 * 63,
         1,
         0,
         0,
         DISK_SECTOR_SIZE,
-        {256, 1024, 64},
+        {256, 512, 63},
         1ull << VIRTIO_BLK_F_SIZE_MAX,
         1ull << VIRTIO_BLK_F_SEG_MAX
     },
     {
         DTYPE_ATA,
         0,
-        {256, 1024, 64},
-        256 * 1024 * 64,
+        {256, 512, 63},
+        256 * 512 * 63,
         2,
         0,
         0,
         DISK_SECTOR_SIZE,
-        {256, 1024, 64},
+        {256, 512, 63},
         1ull << VIRTIO_BLK_F_SIZE_MAX,
         1ull << VIRTIO_BLK_F_SEG_MAX
     },
     {
         DTYPE_ATA,
         0,
-        {256, 1024, 64},
-        256 * 1024 * 64,
+        {256, 512, 63},
+        256 * 512 * 63,
         3,
         0,
         0,
         DISK_SECTOR_SIZE,
-        {256, 1024, 64},
+        {256, 512, 63},
         1ull << VIRTIO_BLK_F_SIZE_MAX,
         1ull << VIRTIO_BLK_F_SEG_MAX
     }
@@ -159,16 +157,33 @@ u8 get_drive_count(u8 type) {
 }
 
 static drive_t* getDrive(u8 extdrive) {
+    drive_t* res = 0;
+    const char* format = "%s/hdd%02X.img";
     if (extdrive < 3) {
-        return &fdds[extdrive];
+        format = "%s/fdd%02X.img";
+        res = &fdds[extdrive];
+        goto r;
     }
     if (extdrive >= 0x80) {
         extdrive &= 0b01111111;
         if (extdrive < 5) {
-            return &hdds[extdrive];
+            res = &hdds[extdrive];
+            goto r;
         }
     }
     return 0;
+r:
+    if (!res->pf) {
+        char filename[32];
+        snprintf(filename, 32, format, HOME_DIR, extdrive);
+        res->pf = calloc(sizeof(FIL), 1);
+        if (f_open(res->pf, filename, FA_READ | FA_WRITE | FA_OPEN_ALWAYS) != FR_OK) {
+            free(res->pf);
+            res->pf = 0;
+            return 0;
+        }
+    }
+    return res;
 }
 
 /**
@@ -202,45 +217,36 @@ CF set on error
  */
 inline static u32 handle_int13_02(u32 eax, u32 ebx, u32 ecx, u32 edx) {
     u8 number_of_sectors_to_read = AL;
-    if (!number_of_sectors_to_read) return DISK_RET_EPARAM;
+    if (!number_of_sectors_to_read) return DISK_RET_EPARAM | CF_ON;
 
     drive_t *drive = getDrive(DL);
-    if (!drive) return DISK_RET_NO_MEDIA;
+    if (!drive) return DISK_RET_NO_MEDIA | CF_ON;
 
     u32 cylinder_number = ((CL & 0xC0) << 2) | CH;
     u32 sector_number = CL & 0x3F;
     u8 head_number = DH;
 
     if (sector_number == 0 || head_number > drive->lchs.head || cylinder_number > drive->lchs.cylinder)
-        return DISK_RET_EPARAM;
+        return DISK_RET_EPARAM | CF_ON;
 
     u32 lba_sector = ((cylinder_number * (drive->lchs.head + 1)) + head_number) * drive->lchs.sector + (sector_number - 1);
     if ((u64)lba_sector + number_of_sectors_to_read > drive->sectors)
-        return DISK_RET_EBOUNDARY;
-
-    char filename[64];
-    snprintf(filename, sizeof(filename), "%s/drive%02X.img", HOME_DIR, DL);
-    FIL f;
-    if (f_open(&f, filename, FA_READ | FA_OPEN_ALWAYS) != FR_OK)
-        return DISK_RET_NO_MEDIA;
+        return DISK_RET_EBOUNDARY | CF_ON;
 
     gpio_put(PICO_DEFAULT_LED_PIN, true);
     FSIZE_t offset = (FSIZE_t)lba_sector * DISK_SECTOR_SIZE;
-    if (f_lseek(&f, offset) != FR_OK) {
-        f_close(&f);
+    if (f_lseek(drive->pf, offset) != FR_OK) {
         gpio_put(PICO_DEFAULT_LED_PIN, false);
-        return DISK_RET_ECONTROLLER;
+        return DISK_RET_ECONTROLLER | CF_ON;
     }
 
     u8* buff = X86_FAR_PTR(X86_ES, BX);
     UINT br;
-    if (f_read(&f, buff, number_of_sectors_to_read * DISK_SECTOR_SIZE, &br) != FR_OK) {
-        f_close(&f);
+    if (f_read(drive->pf, buff, number_of_sectors_to_read * DISK_SECTOR_SIZE, &br) != FR_OK) {
         gpio_put(PICO_DEFAULT_LED_PIN, false);
-        return DISK_RET_ECONTROLLER;
+        return DISK_RET_ECONTROLLER | CF_ON;
     }
 
-    f_close(&f);
     gpio_put(PICO_DEFAULT_LED_PIN, false);
     return br / DISK_SECTOR_SIZE;
 }
@@ -265,10 +271,10 @@ inline static u32 handle_int13_02(u32 eax, u32 ebx, u32 ecx, u32 edx) {
  */
 inline static u32 handle_int13_03(u32 eax, u32 ebx, u32 ecx, u32 edx) {
     u8 number_of_sectors_to_write = AL;
-    if (!number_of_sectors_to_write) return DISK_RET_EPARAM;
+    if (!number_of_sectors_to_write) return DISK_RET_EPARAM | CF_ON;
 
     drive_t *drive = getDrive(DL);
-    if (!drive) return DISK_RET_NO_MEDIA;
+    if (!drive) return DISK_RET_NO_MEDIA | CF_ON;
 
     // Проверка на защищенность от записи
 //    if (drive->readonly) return DISK_RET_EWRITEPROTECT;
@@ -279,38 +285,30 @@ inline static u32 handle_int13_03(u32 eax, u32 ebx, u32 ecx, u32 edx) {
     u8 head_number = DH;
 
     if (sector_number == 0 || head_number > drive->lchs.head || cylinder_number > drive->lchs.cylinder) {
-        return DISK_RET_EPARAM;
+        return DISK_RET_EPARAM | CF_ON;
     }
 
     FSIZE_t lba = ((u32)cylinder_number * (drive->lchs.head + 1) + head_number) * drive->lchs.sector + (sector_number - 1);
 
     // Проверка на выход за пределы
     if ((lba + number_of_sectors_to_write) > drive->sectors) {
-        return DISK_RET_EBOUNDARY;
+        return DISK_RET_EBOUNDARY | CF_ON;
     }
     lba *= DISK_SECTOR_SIZE;
 
-    char filename[64];
-    snprintf(filename, sizeof(filename), "%s/drive%02X.img", HOME_DIR, DL);
-    FIL f;
-    if (f_open(&f, filename, FA_WRITE | FA_OPEN_ALWAYS) != FR_OK)
-        return DISK_RET_NO_MEDIA;
-
     gpio_put(PICO_DEFAULT_LED_PIN, true);
-    if (f_lseek(&f, lba) != FR_OK) {
-        f_close(&f);
+    if (f_lseek(drive->pf, lba) != FR_OK) {
         gpio_put(PICO_DEFAULT_LED_PIN, false);
-        return DISK_RET_EPARAM;
+        return DISK_RET_EPARAM | CF_ON;
     }
 
     UINT br = 0;
-    if (f_write(&f, buff, number_of_sectors_to_write * DISK_SECTOR_SIZE, &br) != FR_OK) {
-        f_close(&f);
+    if (f_write(drive->pf, buff, number_of_sectors_to_write * DISK_SECTOR_SIZE, &br) != FR_OK) {
         gpio_put(PICO_DEFAULT_LED_PIN, false);
-        return DISK_RET_EPARAM;
+        return DISK_RET_EPARAM | CF_ON;
     }
 
-    f_close(&f);
+    f_sync(drive->pf);
     gpio_put(PICO_DEFAULT_LED_PIN, false);
     return br / DISK_SECTOR_SIZE;
 }
@@ -337,37 +335,51 @@ inline static u32 handle_int13_03(u32 eax, u32 ebx, u32 ecx, u32 edx) {
  */
 inline static u32 handle_int13_05_fdd(u32 eax, u32 ebx, u32 ecx, u32 edx) {
     drive_t *drive = getDrive(DL);
-    if (!drive) return DISK_RET_NO_MEDIA;
-
-    u8* buff = X86_FAR_PTR(X86_ES, BX);
-    if (buff[3] != DISK_SECTOR_SIZE) return DISK_RET_EPARAM;
-
-    drive->lchs.cylinder = drive->pchs.cylinder = *buff++;
-    drive->lchs.head = drive->pchs.head = *buff++;
-    drive->lchs.sector = drive->pchs.sector = *buff++;
-
-    char filename[64];
-    snprintf(filename, 64, "%s/drive%02X.img", HOME_DIR, DL);
-    FIL f;
-    if (f_open(&f, filename, FA_WRITE | FA_OPEN_ALWAYS) != FR_OK) return DISK_RET_NO_MEDIA;
-
-    u32 cylinder_number = CH;
-    u8 head_number = DH;
-    FSIZE_t lba = (cylinder_number * drive->lchs.head + head_number) * drive->lchs.sector;
-    lba *= DISK_SECTOR_SIZE;
-    if (f_lseek(&f, lba) != FR_OK) {
-        f_close(&f);
+    if (!drive) {
+        return DISK_RET_NO_MEDIA;
+    }
+    if (drive->type != DTYPE_FLOPPY) {
         return DISK_RET_EPARAM;
     }
+
     u8 buf[DISK_SECTOR_SIZE] = { 0 };
-    UINT br;
-    for (u8 i = 0; i < AL; ++i) {
-        if (f_write(&f, buf, DISK_SECTOR_SIZE, &br) != FR_OK) {
-            f_close(&f);
+    gpio_put(PICO_DEFAULT_LED_PIN, true);
+    u8* buff = X86_FAR_PTR(X86_ES, BX);
+    for (int sectorN = 0; sectorN < AL; ++sectorN) {
+        u8 track_num = buff[sectorN * 4 + 0];
+        u8 head_num  = buff[sectorN * 4 + 1];
+        u8 sector_num = buff[sectorN * 4 + 2];
+        u8 sector_size_code = buff[sectorN * 4 + 3];
+
+        if (sector_size_code != 2) { // только 512 байт поддерживаем
+            gpio_put(PICO_DEFAULT_LED_PIN, false);
+            return DISK_RET_EPARAM;
+        }
+
+        // Теперь считаем LBA:
+        // LBA = (track_number * heads_per_cylinder + head_number) * sectors_per_track + (sector_number - 1)
+        u32 heads_per_cylinder = drive->lchs.head;      // число головок
+        u32 sectors_per_track  = drive->lchs.sector;    // Число секторов на дорожку
+
+        if (head_num >= heads_per_cylinder || sector_num == 0 || sector_num > sectors_per_track) {
+            gpio_put(PICO_DEFAULT_LED_PIN, false);
+            return DISK_RET_EPARAM;
+        }
+
+        FSIZE_t lba = ((FSIZE_t)track_num * heads_per_cylinder + head_num) * sectors_per_track + (sector_num - 1);
+        lba *= DISK_SECTOR_SIZE; // в байтах
+        if (f_lseek(drive->pf, lba) != FR_OK) {
+            gpio_put(PICO_DEFAULT_LED_PIN, false);
+            return DISK_RET_EPARAM;
+        }
+        UINT br;
+        if (f_write(drive->pf, buf, DISK_SECTOR_SIZE, &br) != FR_OK || br != DISK_SECTOR_SIZE) {
+            gpio_put(PICO_DEFAULT_LED_PIN, false);
             return DISK_RET_EPARAM;
         }
     }
-    f_close(&f);
+    f_sync(drive->pf);
+    gpio_put(PICO_DEFAULT_LED_PIN, false);
     return DISK_RET_SUCCESS;
 }
 
@@ -396,20 +408,18 @@ inline static u32 handle_int13_05_fdd(u32 eax, u32 ebx, u32 ecx, u32 edx) {
 inline static u32 handle_int13_05_hdd(u32 eax, u32 ebx, u32 ecx, u32 edx) {
     drive_t *drive = getDrive(DL);
     if (!drive) return DISK_RET_NO_MEDIA;
+    if (drive->type == DTYPE_FLOPPY) return DISK_RET_EPARAM;
 
-    char filename[64];
-    snprintf(filename, 64, "%s/drive%02X.img", HOME_DIR, DL);
-    FIL f;
-    if (f_open(&f, filename, FA_WRITE | FA_OPEN_ALWAYS) != FR_OK) return DISK_RET_NO_MEDIA;
+    gpio_put(PICO_DEFAULT_LED_PIN, true);
 
     u8* fmtbuf = X86_FAR_PTR(X86_ES, BX);
 
     // Извлекаем CHS
     u16 cylinder = ((CL & 0xC0) << 2) | CH;  // CL[7:6] → bits 8-9, CH → bits 0-7
     u8 head = DH;
-
     u32 sectors_per_track = drive->pchs.sector;
 
+    u8 buf[DISK_SECTOR_SIZE] = {0};
     // Ожидаем, что первые 2*(spt) байта содержат F и N пары
     for (u32 i = 0; i < sectors_per_track; ++i) {
         u8 flag = fmtbuf[2 * i];
@@ -424,19 +434,19 @@ inline static u32 handle_int13_05_hdd(u32 eax, u32 ebx, u32 ecx, u32 edx) {
         // Вычисляем LBA
         FSIZE_t lba = ((cylinder * drive->pchs.head) + head) * sectors_per_track + (sect_num - 1);
         lba *= DISK_SECTOR_SIZE;
-        if (f_lseek(&f, lba) != FR_OK) {
-            f_close(&f);
+        if (f_lseek(drive->pf, lba) != FR_OK) {
+            gpio_put(PICO_DEFAULT_LED_PIN, false);
             return DISK_RET_EPARAM;
         }
 
-        u8 buf[DISK_SECTOR_SIZE] = {0};
         UINT bw;
-        if (f_write(&f, buf, DISK_SECTOR_SIZE, &bw) != FR_OK || bw != DISK_SECTOR_SIZE) {
-            f_close(&f);
+        if (f_write(drive->pf, buf, DISK_SECTOR_SIZE, &bw) != FR_OK || bw != DISK_SECTOR_SIZE) {
+            gpio_put(PICO_DEFAULT_LED_PIN, false);
             return DISK_RET_EPARAM;
         }
     }
-    f_close(&f);
+    f_sync(drive->pf);
+    gpio_put(PICO_DEFAULT_LED_PIN, false);
     return DISK_RET_SUCCESS;
 }
 
@@ -468,29 +478,20 @@ inline static u32 handle_int13_06(u32 eax, u32 ecx, u32 edx) {
     if (sector_count == 0 || sector_count > sectors_per_track)
         return DISK_RET_EPARAM;
 
-    // Форматируем указанный трек — обнуляем нужное количество секторов
-    char filename[64];
-    snprintf(filename, sizeof(filename), "%s/drive%02X.img", HOME_DIR, DL);
-
-    FIL f;
-    if (f_open(&f, filename, FA_WRITE | FA_OPEN_ALWAYS) != FR_OK) return DISK_RET_NO_MEDIA;
-
     UINT bw;
     u8 buf[DISK_SECTOR_SIZE] = {0};
 
     for (u8 i = 0; i < sector_count; ++i) {
         FSIZE_t lba = ((cylinder * drive->pchs.head + head) * sectors_per_track) + i;
         lba *= DISK_SECTOR_SIZE;
-        if (f_lseek(&f, lba) != FR_OK) {
-            f_close(&f);
+        if (f_lseek(drive->pf, lba) != FR_OK) {
             return DISK_RET_EPARAM;
         }
-        if (f_write(&f, buf, DISK_SECTOR_SIZE, &bw) != FR_OK || bw != DISK_SECTOR_SIZE) {
-            f_close(&f);
+        if (f_write(drive->pf, buf, DISK_SECTOR_SIZE, &bw) != FR_OK || bw != DISK_SECTOR_SIZE) {
             return DISK_RET_EPARAM;
         }
     }
-    f_close(&f);
+    f_sync(drive->pf);
     return DISK_RET_SUCCESS;
 }
 
@@ -522,34 +523,20 @@ inline static u32 handle_int13_07(u32 eax, u32 ebx, u32 ecx, u32 edx) {
     if (sector_count == 0 || sector_count > sectors_per_track)
         return DISK_RET_EPARAM;
 
-    // Адрес форматного буфера (ES:BX)
-//    u8* format_buffer = X86_FAR_PTR(X86_ES, BX);
-//    (void)format_buffer; // Пока не используем содержимое
-
-    // Форматируем секторы на данном треке
-    char filename[64];
-    snprintf(filename, sizeof(filename), "%s/drive%02X.img", HOME_DIR, DL);
-
-    FIL f;
-    if (f_open(&f, filename, FA_WRITE | FA_OPEN_ALWAYS) != FR_OK)
-        return DISK_RET_NO_MEDIA;
-
     UINT bw;
     u8 buf[DISK_SECTOR_SIZE] = {0};
 
     for (u8 i = 0; i < sector_count; ++i) {
         FSIZE_t lba = ((cylinder * drive->pchs.head + head) * sectors_per_track) + i;
         lba *= DISK_SECTOR_SIZE;
-        if (f_lseek(&f, lba) != FR_OK) {
-            f_close(&f);
+        if (f_lseek(drive->pf, lba) != FR_OK) {
             return DISK_RET_EPARAM;
         }
-        if (f_write(&f, buf, DISK_SECTOR_SIZE, &bw) != FR_OK || bw != DISK_SECTOR_SIZE) {
-            f_close(&f);
+        if (f_write(drive->pf, buf, DISK_SECTOR_SIZE, &bw) != FR_OK || bw != DISK_SECTOR_SIZE) {
             return DISK_RET_EPARAM;
         }
     }
-    f_close(&f);
+    f_sync(drive->pf);
     return DISK_RET_SUCCESS;
 }
 
@@ -663,16 +650,9 @@ inline static u32 handle_int13_0A(u32 eax, u32 ebx, u32 ecx, u32 edx) {
 
     if ((u64)lba + sectors_to_read > drive->sectors)
         return DISK_RET_EBOUNDARY;
-
-    char filename[64];
-    snprintf(filename, sizeof(filename), "%s/drive%02X.img", HOME_DIR, DL);
-    FIL f;
-    if (f_open(&f, filename, FA_READ | FA_OPEN_ALWAYS) != FR_OK)
-        return DISK_RET_ECONTROLLER;
     
     FSIZE_t offset = (FSIZE_t)lba * drive->blksize;
-    if (f_lseek(&f, offset) != FR_OK) {
-        f_close(&f);
+    if (f_lseek(drive->pf, offset) != FR_OK) {
         return DISK_RET_ECONTROLLER;
     }
     
@@ -681,13 +661,11 @@ inline static u32 handle_int13_0A(u32 eax, u32 ebx, u32 ecx, u32 edx) {
     u32 sectors_read = 0;
     for (; sectors_read < sectors_to_read; ++sectors_read) {
         UINT br;
-        if (f_read(&f, buffer, drive->blksize, &br) != FR_OK || br != drive->blksize) {
-            f_close(&f);
+        if (f_read(drive->pf, buffer, drive->blksize, &br) != FR_OK || br != drive->blksize) {
             return DISK_RET_ECONTROLLER | sectors_read; // AH | AL
         }
         buffer += drive->blksize;
     }
-    f_close(&f);
     return DISK_RET_SUCCESS | sectors_read; // AH | AL
 }
 
@@ -731,16 +709,9 @@ inline static u32 handle_int13_0B(u32 eax, u32 ebx, u32 ecx, u32 edx) {
 
     if ((u64)lba + sectors_to_read > drive->sectors)
         return DISK_RET_EBOUNDARY;
-
-    char filename[64];
-    snprintf(filename, sizeof(filename), "%s/drive%02X.img", HOME_DIR, DL);
-    FIL f;
-    if (f_open(&f, filename, FA_WRITE | FA_OPEN_ALWAYS) != FR_OK)
-        return DISK_RET_ECONTROLLER;
     
     FSIZE_t offset = (FSIZE_t)lba * drive->blksize;
-    if (f_lseek(&f, offset) != FR_OK) {
-        f_close(&f);
+    if (f_lseek(drive->pf, offset) != FR_OK) {
         return DISK_RET_ECONTROLLER;
     }
     
@@ -749,13 +720,12 @@ inline static u32 handle_int13_0B(u32 eax, u32 ebx, u32 ecx, u32 edx) {
     u32 sectors_read = 0;
     for (; sectors_read < sectors_to_read; ++sectors_read) {
         UINT br;
-        if (f_write(&f, buffer, drive->blksize, &br) != FR_OK || br != drive->blksize) {
-            f_close(&f);
+        if (f_write(drive->pf, buffer, drive->blksize, &br) != FR_OK || br != drive->blksize) {
             return DISK_RET_ECONTROLLER | sectors_read; // AH | AL
         }
         buffer += drive->blksize;
     }
-    f_close(&f);
+    f_sync(drive->pf);
     return DISK_RET_SUCCESS | sectors_read; // AH | AL
 }
 
@@ -779,26 +749,17 @@ inline static u32 handle_int13_0E(u32 eax, u32 ebx, u32 ecx, u32 edx) {
     if (lba + sectors_to_read > drive->sectors)
         return DISK_RET_EBOUNDARY;
 
-    char filename[64];
-    snprintf(filename, 64, "%s/drive%02X.img", HOME_DIR, DL);
-    FIL f;
-    if (f_open(&f, filename, FA_READ | FA_OPEN_ALWAYS) != FR_OK)
-        return DISK_RET_NO_MEDIA;
-
     FSIZE_t offset = (FSIZE_t)lba * DISK_SECTOR_SIZE;
-    if (f_lseek(&f, offset) != FR_OK) {
-        f_close(&f);
+    if (f_lseek(drive->pf, offset) != FR_OK) {
         return DISK_RET_EPARAM;
     }
 
     u8 *buffer = X86_FAR_PTR(X86_ES, BX);
     UINT br;
-    if (f_read(&f, buffer, DISK_SECTOR_SIZE, &br) != FR_OK) {
-        f_close(&f);
+    if (f_read(drive->pf, buffer, DISK_SECTOR_SIZE, &br) != FR_OK) {
         return DISK_RET_EPARAM;
     }
 
-    f_close(&f);
     return DISK_RET_SUCCESS | sectors_to_read;
 }
 
@@ -822,26 +783,18 @@ inline static u32 handle_int13_0F(u32 eax, u32 ebx, u32 ecx, u32 edx) {
     if (lba + sectors_to_write > drive->sectors)
         return DISK_RET_EBOUNDARY;
 
-    char filename[64];
-    snprintf(filename, 64, "%s/drive%02X.img", HOME_DIR, DL);
-    FIL f;
-    if (f_open(&f, filename, FA_WRITE | FA_OPEN_ALWAYS) != FR_OK)
-        return DISK_RET_NO_MEDIA;
-
     FSIZE_t offset = (FSIZE_t)lba * DISK_SECTOR_SIZE;
-    if (f_lseek(&f, offset) != FR_OK) {
-        f_close(&f);
+    if (f_lseek(drive->pf, offset) != FR_OK) {
         return DISK_RET_EPARAM;
     }
 
     u8 *buffer = X86_FAR_PTR(X86_ES, BX);
     UINT br;
-    if (f_write(&f, buffer, DISK_SECTOR_SIZE, &br) != FR_OK) {
-        f_close(&f);
+    if (f_write(drive->pf, buffer, DISK_SECTOR_SIZE, &br) != FR_OK) {
         return DISK_RET_EPARAM;
     }
 
-    f_close(&f);
+    f_sync(drive->pf);
     return DISK_RET_SUCCESS | sectors_to_write;
 }
 
@@ -902,9 +855,12 @@ inline static u32 disk_ret(u32 r) {
     return r;
 }
 
-u32 x86_int13_hanler_C(u32 eax, u32 ebx, u32 ecx, u32 edx) {
-    goutf(TEXTMODE_ROWS - 1, false, "x86_int13_hanler_C(%08X, %08X, %08X, %08X)", eax, ebx, ecx, edx);
+inline static u32 pure_disk_ret(u32 r) {
+    last_op_res = r;
+    return r;
+}
 
+u32 x86_int13_hanler_C(u32 eax, u32 ebx, u32 ecx, u32 edx) {
     if (!cd_card_mount) return disk_ret(DISK_RET_NO_MEDIA);
     u8 extdrive = DL;
     if (CONFIG_CDROM_EMU) {
@@ -919,13 +875,13 @@ u32 x86_int13_hanler_C(u32 eax, u32 ebx, u32 ecx, u32 edx) {
             return last_op_res;
         case 2:
             // READ SECTORS INTO MEMORY
-            return disk_ret(handle_int13_02(eax, ebx, ecx, edx));
+            return pure_disk_ret(handle_int13_02(eax, ebx, ecx, edx));
         case 3:
             // WRITE DISK SECTOR(S)
-            return disk_ret(handle_int13_03(eax, ebx, ecx, edx));
+            return pure_disk_ret(handle_int13_03(eax, ebx, ecx, edx));
         case 4:
             // VERIFY DISK SECTOR(S) (TODO: ??)
-            return disk_ret(AL);
+            return pure_disk_ret(AL);
         case 5:
             if (DL < 2) // FORMAT FLOPPY DRIVE
                 return disk_ret(handle_int13_05_fdd(eax, ebx, ecx, edx));
@@ -959,5 +915,7 @@ u32 x86_int13_hanler_C(u32 eax, u32 ebx, u32 ecx, u32 edx) {
         case 0x15:
             return handle_int13_15(edx);
     }
+    /// TODO: remove it
+    goutf(TEXTMODE_ROWS - 1, false, "x86_int13_hanler_C(%08X, %08X, %08X, %08X) ret 1", eax, ebx, ecx, edx);
     return disk_ret(DISK_RET_EPARAM);
 }

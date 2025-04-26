@@ -583,54 +583,95 @@ static uint8_t* PSRAM_DATA = (uint8_t*)0;
 #endif
 #endif
 
-inline static u32 x86_int10(u32 eax) {
-    register u32 result __asm__("r0");   // result = строго r0
+inline static u32 x86_int10(u32 eax, u32 ebx, u32 ecx, u32 edx) {
+    register u32 in_eax __asm__("r0") = eax;
+    register u32 in_ebx __asm__("r1") = ebx;
+    register u32 in_ecx __asm__("r2") = ecx;
+    register u32 in_edx __asm__("r3") = edx;
+    register u32 result __asm__("r0"); // результат будет в r0
     __asm__ volatile (
-        "  push  {r1-r12, lr}\n"         // wrapper registers protection
-        "  mov   r4, %[in_eax]\n"        // r4 - EAX
-        "  CPSID i\n"                    // Запрет прерываний
-        "  adr   r0, 1f\n"               // Адрес возврата (метка 1)
-        "  mrs   r1, apsr\n"             // Сохраняем флаги
-        "  push  {r0, r1}\n"             // Эмулируем x86: PUSH IP, PUSH FLAGS
-        "  ldr   r0, =0x11000040\n"      // Адрес обработчика INT 10h
-        "  ldr   r0, [r0]\n"
-        "  mov   pc, r0\n"               // Переход к обработчику
-        "1:\n"                           // Метка возврата
-        "  mov   r0, r4\n"               // r4 - EAX
-        "  pop   {r1-r12, lr}\n"         // wrapper registers protection
-        : /// [out_result] "=r"(result)      // Указываем, что результат будет в переменной 'result'
-        : [in_eax] "r"(eax)              // Входной операнд: 'eax' передается в r0
-        : "r0", "memory"                 // Ожидаемые изменения в регистрах и памяти
+        "  push {r1-r12, lr}\n"         // Сохраняем рабочие регистры (r1-r12, lr)
+        "  mov  r4, r0\n"               // r4 = EAX
+        "  mov  r5, r1\n"               // r5 = EBX
+        "  mov  r6, r2\n"               // r6 = ECX
+        "  mov  r7, r3\n"               // r7 = EDX
+        "  CPSID i\n"                   // Запрет прерываний
+        "  adr  r11, 1f\n"              // Адрес возврата (метка 1)
+        "  mrs  r12, apsr\n"            // Сохраняем флаги
+        "  push {r11, r12}\n"           // Эмулируем PUSH IP, PUSH FLAGS
+        "  ldr  r11, =0x11000040\n"     // Адрес обработчика INT 10h
+        "  ldr  r11, [r11]\n"
+        "  mov  pc, r11\n"              // Переход к обработчику
+        "1:\n"                          // Метка возврата
+        "  mov  r0, r4\n"               // В r0 результат (из r4)
+        "  pop  {r1-r12, lr}\n"          // Восстанавливаем сохранённые регистры
+        :
+        : "r"(in_eax), "r"(in_ebx), "r"(in_ecx), "r"(in_edx)
+        : "r4", "r5", "r6", "r7", "r11", "r12", "memory"
     );
     return result;
 }
 
 inline static u32 x86_int13(u32 eax, u32 ebx, u32 ecx, u32 edx) {
-    register u32 result __asm__("r0");   // result = строго r0
+    register u32 in_eax __asm__("r0") = eax;
+    register u32 in_ebx __asm__("r1") = ebx;
+    register u32 in_ecx __asm__("r2") = ecx;
+    register u32 in_edx __asm__("r3") = edx;
+    register u32 result __asm__("r0"); // результат будет в r0
     __asm__ volatile (
-        "  push  {r1-r12, lr}\n"         // wrapper registers protection
-        "  mov   r4, %[in_eax]\n"        // r4 - EAX
-        "  mov   r5, %[in_ebx]\n"        // r5 - EBX
-        "  mov   r6, %[in_ecx]\n"        // r6 - ECX
-        "  mov   r7, %[in_edx]\n"        // r7 - EDX
-        "  CPSID i\n"                    // Запрет прерываний
-        "  adr   r11, 1f\n"              // Адрес возврата (метка 1)
-        "  mrs   r12, apsr\n"            // Сохраняем флаги
-        "  push  {r11, r12}\n"           // Эмулируем x86: PUSH IP, PUSH FLAGS
-        "  ldr   r11, =0x1100004C\n"     // Адрес обработчика INT 13h
-        "  ldr   r11, [r11]\n"
-        "  mov   pc, r11\n"              // Переход к обработчику
-        "1:\n"                           // Метка возврата
-        "  mov   r0, r4\n"               // r4 - EAX
-        "  pop   {r1-r12, lr}\n"         // wrapper registers protection
-        : /// [out_result] "=r"(result)      // Указываем, что результат будет в переменной 'result'
-        : [in_eax] "r"(eax),             // Входной операнд: 'eax' передается в r0
-          [in_ebx] "r"(ebx),
-          [in_ecx] "r"(ecx),
-          [in_edx] "r"(edx)
-        : "r0", "memory"                 // Ожидаемые изменения в регистрах и памяти
+        "  push {r1-r12, lr}\n"         // Сохраняем рабочие регистры (r1-r12, lr)
+        "  mov  r4, r0\n"               // r4 = EAX
+        "  mov  r5, r1\n"               // r5 = EBX
+        "  mov  r6, r2\n"               // r6 = ECX
+        "  mov  r7, r3\n"               // r7 = EDX
+        "  CPSID i\n"                   // Запрет прерываний
+        "  adr  r11, 1f\n"              // Адрес возврата (метка 1)
+        "  mrs  r12, apsr\n"            // Сохраняем флаги
+        "  push {r11, r12}\n"           // Эмулируем PUSH IP, PUSH FLAGS
+        "  ldr  r11, =0x1100004C\n"     // Адрес обработчика INT 13h
+        "  ldr  r11, [r11]\n"
+        "  mov  pc, r11\n"              // Переход к обработчику
+        "1:\n"                          // Метка возврата
+        "  mov  r0, r4\n"               // В r0 результат (из r4)
+        "  pop  {r1-r12, lr}\n"          // Восстанавливаем сохранённые регистры
+        :
+        : "r"(in_eax), "r"(in_ebx), "r"(in_ecx), "r"(in_edx)
+        : "r4", "r5", "r6", "r7", "r11", "r12", "memory"
     );
     return result;
+}
+
+static void format_hdd_test(int y) {
+    u32 total_tracks = 512;          // Максимальное количество дорожек
+    u32 heads = 256;                 // Максимальное количество головок
+    u32 sectors_per_track = 63;      // Максимальное количество секторов на дорожку
+
+    u8* buff = X86_FAR_PTR(X86_ES, 0x1000);  // Буфер для форматирования
+
+    for (u32 track = 510; track < total_tracks; ++track) {
+        for (u32 head = 0; head < heads; ++head) {
+            // Заполняем буфер F/N парами
+            for (u32 sector = 0; sector < sectors_per_track; ++sector) {
+                buff[sector * 2 + 0] = 0x00;      // F = хороший сектор
+                buff[sector * 2 + 1] = sector + 1; // N = номер сектора (начинается с 1)
+            }
+
+            // Формируем регистры для INT 13h AH=05h
+            u32 ch = track & 0xFF;
+            u32 cl = ((track >> 8) & 0x03) << 6;  // старшие 2 бита номера цилиндра
+            cl |= 1;                              // номер первого сектора (обычно 1)
+
+            u32 eax = (5 << 8) | sectors_per_track;    // AH=05h, AL=кол-во секторов
+            u32 ebx = 0x1000;                         // смещение 0x1000 в сегменте ES
+            u32 ecx = (ch << 8) | cl;                 // CH:CL
+            u32 edx = (head << 8) | 0x80;             // DH:DL
+
+            u32 status = x86_int13(eax, ebx, ecx, edx);
+
+            goutf(y, false, "INT 13 AH=5 format [%d:%d:1-63] rc: %08X", track, head, status);
+            if (status) return;
+        }
+    }
 }
 
 int main() {
@@ -794,6 +835,13 @@ skip_it:
 #endif
 
     gpio_init(PICO_DEFAULT_LED_PIN);
+    gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
+    for (int i = 0; i < 6; i++) {
+        sleep_ms(23);
+        gpio_put(PICO_DEFAULT_LED_PIN, true);
+        sleep_ms(23);
+        gpio_put(PICO_DEFAULT_LED_PIN, false);
+    }
 
     // init interrupts
     volatile uint32_t* X86_BASE_RAM = (uint32_t*)PSRAM_DATA;
@@ -802,8 +850,9 @@ skip_it:
     }
     X86_BASE_RAM[0x10] = (uint32_t)&x86_int10_hanler;
     X86_BASE_RAM[0x13] = (uint32_t)&x86_int13_hanler;
-///    u32 eax = x86_int10(0);
-///    goutf(y++, false, "INT 10 AH=0 rc: %08X", eax);
+    u32 eax = x86_int10(0, 0, 0, 0);
+    goutf(y++, false, "INT 10 AH=0 rc: %08X", eax);
+#if 0
     u32 eax = x86_int13(0, 0, 0, 0);
     goutf(y++, false, "INT 13 AH=0 rc: %08X", eax);
     eax = x86_int13(1 << 8, 0, 0, 0);
@@ -818,6 +867,26 @@ skip_it:
     
     eax = x86_int13((2 << 8) | 1, 0x1000, 1, 0);
     goutf(y++, false, "INT 13 AH=2 AL=1 CL=1 ES:BX=[%04X:1000] rc: %08X", X86_ES, eax);
+
+    for (u32 track = 0; track < 80; ++track) {
+        for (u32 head = 0; head < 2; ++head) {
+            for (u32 sector = 0; sector < 18; ++sector) {
+                buff[sector * 4 + 0] = track;         // Track number
+                buff[sector * 4 + 1] = head;          // Head number
+                buff[sector * 4 + 2] = sector + 1;    // Sector number (начинается с 1)
+                buff[sector * 4 + 3] = 2;             // 512 bytes per sector
+            }
+            u32 eax = (5 << 8) | 18;   // AH=05h, AL=кол-во секторов
+            u32 ebx = 0x1000;          // смещение 0x1000 в сегменте ES
+            u32 ecx = (track << 8);    // CH=track, CL=0 пока
+            u32 edx = (head << 8);     // DH=head, DL=0 (диск 0)
+            u32 status = x86_int13(eax, ebx, ecx, edx);
+            goutf(y, false, "INT 13 AH=5 format [%d:%d:1-18] rc: %08X", track, head, status);
+        }
+    }
+    y++;
+    format_hdd_test(y++);
+#endif
     /*
     uint32_t entry_iret_official = (uint32_t)PSRAM_DATA + 0xff53;
     {

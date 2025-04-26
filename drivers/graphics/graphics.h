@@ -83,6 +83,8 @@ void draw_window(const char* title, uint32_t x, uint32_t y, uint32_t width, uint
 void clrScr_hdmi(uint8_t color);
 void clrScr(uint8_t color);
 
+void goutf(int outline, bool err, const char *__restrict str, ...);
+
 #ifdef __cplusplus
 }
 #endif
