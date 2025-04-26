@@ -802,14 +802,22 @@ skip_it:
     }
     X86_BASE_RAM[0x10] = (uint32_t)&x86_int10_hanler;
     X86_BASE_RAM[0x13] = (uint32_t)&x86_int13_hanler;
-    u32 eax = x86_int10(0);
-    goutf(y++, false, "INT 10 AH=0 rc: %08X", eax);
-    eax = x86_int13(0, 0, 0, 0);
+///    u32 eax = x86_int10(0);
+///    goutf(y++, false, "INT 10 AH=0 rc: %08X", eax);
+    u32 eax = x86_int13(0, 0, 0, 0);
     goutf(y++, false, "INT 13 AH=0 rc: %08X", eax);
     eax = x86_int13(1 << 8, 0, 0, 0);
     goutf(y++, false, "INT 13 AH=1 rc: %08X", eax);
-    eax = x86_int13(2 << 8 | 1, 0x1000, 0, 0);
-    goutf(y++, false, "INT 13 AH=2 AL=1 ES:BX=[%04X:1000] rc: %08X", X86_ES, eax);
+
+    u8* buff = X86_FAR_PTR(X86_ES, 0x1000);
+    for (int i = 0; i < 512; ++i)
+        buff[i] = (u8)i;
+
+    eax = x86_int13((3 << 8) | 1, 0x1000, 1, 0);
+    goutf(y++, false, "INT 13 AH=3 AL=1 CL=1 ES:BX=[%04X:1000] rc: %08X", X86_ES, eax);
+    
+    eax = x86_int13((2 << 8) | 1, 0x1000, 1, 0);
+    goutf(y++, false, "INT 13 AH=2 AL=1 CL=1 ES:BX=[%04X:1000] rc: %08X", X86_ES, eax);
     /*
     uint32_t entry_iret_official = (uint32_t)PSRAM_DATA + 0xff53;
     {

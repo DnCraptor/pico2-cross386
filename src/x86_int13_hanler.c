@@ -5,6 +5,9 @@
 #include "ff.h"
 #include "x86.h"
 
+#include "graphics.h"
+void goutf(int outline, bool err, const char *__restrict str, ...);
+
 bool cd_card_mount = false;
 const char HOME_DIR[] = "/cross";
 
@@ -239,7 +242,7 @@ inline static u32 handle_int13_02(u32 eax, u32 ebx, u32 ecx, u32 edx) {
 
     f_close(&f);
     gpio_put(PICO_DEFAULT_LED_PIN, false);
-    return DISK_RET_SUCCESS | (br / DISK_SECTOR_SIZE);
+    return br / DISK_SECTOR_SIZE;
 }
 
 /**
@@ -270,40 +273,46 @@ inline static u32 handle_int13_03(u32 eax, u32 ebx, u32 ecx, u32 edx) {
     // Проверка на защищенность от записи
 //    if (drive->readonly) return DISK_RET_EWRITEPROTECT;
 
+    u8* buff = X86_FAR_PTR(X86_ES, BX);
+    u32 sector_number = CL & 0b00111111;  // [1..63]
+    u32 cylinder_number = ((CL & 0xC0) << 2) | CH;  // 10 bits
+    u8 head_number = DH;
+
+    if (sector_number == 0 || head_number > drive->lchs.head || cylinder_number > drive->lchs.cylinder) {
+        return DISK_RET_EPARAM;
+    }
+
+    FSIZE_t lba = ((u32)cylinder_number * (drive->lchs.head + 1) + head_number) * drive->lchs.sector + (sector_number - 1);
+
+    // Проверка на выход за пределы
+    if ((lba + number_of_sectors_to_write) > drive->sectors) {
+        return DISK_RET_EBOUNDARY;
+    }
+    lba *= DISK_SECTOR_SIZE;
+
     char filename[64];
     snprintf(filename, sizeof(filename), "%s/drive%02X.img", HOME_DIR, DL);
     FIL f;
     if (f_open(&f, filename, FA_WRITE | FA_OPEN_ALWAYS) != FR_OK)
         return DISK_RET_NO_MEDIA;
 
-    u8* buff = X86_FAR_PTR(X86_ES, BX);
-    u32 sector_number = CL & 0b00111111;  // [1..63]
-    u32 cylinder_number = ((CL & 0xC0) << 2) | CH;  // 10 bits
-    u8 head_number = DH;
-
-    if (sector_number == 0 || head_number > drive->lchs.head || cylinder_number > drive->lchs.cylinder)
-        return DISK_RET_EPARAM;
-
-    FSIZE_t lba = ((u32)cylinder_number * (drive->lchs.head + 1) + head_number) * drive->lchs.sector + (sector_number - 1);
-
-    // Проверка на выход за пределы
-    if ((lba + number_of_sectors_to_write) > drive->sectors)
-        return DISK_RET_EBOUNDARY;
-
-    lba *= DISK_SECTOR_SIZE;
+    gpio_put(PICO_DEFAULT_LED_PIN, true);
     if (f_lseek(&f, lba) != FR_OK) {
         f_close(&f);
+        gpio_put(PICO_DEFAULT_LED_PIN, false);
         return DISK_RET_EPARAM;
     }
 
-    UINT br;
+    UINT br = 0;
     if (f_write(&f, buff, number_of_sectors_to_write * DISK_SECTOR_SIZE, &br) != FR_OK) {
         f_close(&f);
+        gpio_put(PICO_DEFAULT_LED_PIN, false);
         return DISK_RET_EPARAM;
     }
 
     f_close(&f);
-    return DISK_RET_SUCCESS | (br / DISK_SECTOR_SIZE);
+    gpio_put(PICO_DEFAULT_LED_PIN, false);
+    return br / DISK_SECTOR_SIZE;
 }
 
 /**
@@ -894,6 +903,8 @@ inline static u32 disk_ret(u32 r) {
 }
 
 u32 x86_int13_hanler_C(u32 eax, u32 ebx, u32 ecx, u32 edx) {
+    goutf(TEXTMODE_ROWS - 1, false, "x86_int13_hanler_C(%08X, %08X, %08X, %08X)", eax, ebx, ecx, edx);
+
     if (!cd_card_mount) return disk_ret(DISK_RET_NO_MEDIA);
     u8 extdrive = DL;
     if (CONFIG_CDROM_EMU) {

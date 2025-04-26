@@ -9,19 +9,19 @@ typedef uint8_t u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
 typedef uint64_t u64;
-#define AL (u8)(eax)
-#define AH (u8)((eax >> 8))
-#define AX (u16)(eax)
-#define BL (u8)(ebx)
-#define BH (u8)((ebx >> 8))
-#define BX (u16)(ebx)
-#define CL (u8)(ecx)
-#define CH (u8)((ecx >> 8))
-#define CX (u16)(ecx)
-#define DL (u8)(edx)
-#define DH (u8)((edx >> 8))
-#define DX (u16)(edx)
-#define DI (u16)(edi)
+#define AL ((u8)(eax))
+#define AH ((u8)((eax >> 8)))
+#define AX ((u16)(eax))
+#define BL ((u8)(ebx))
+#define BH ((u8)((ebx >> 8)))
+#define BX ((u16)(ebx))
+#define CL ((u8)(ecx))
+#define CH ((u8)((ecx >> 8)))
+#define CX ((u16)(ecx))
+#define DL ((u8)(edx))
+#define DH ((u8)((edx >> 8)))
+#define DX ((u16)(edx))
+#define DI ((u16)(edi))
 
 extern u16 X86_CS;
 extern u16 X86_DS;
