@@ -6,8 +6,6 @@
 #include "ff.h"
 #include "x86.h"
 
-#include "graphics.h"
-
 bool cd_card_mount = false;
 const char HOME_DIR[] = "/cross";
 
@@ -915,7 +913,5 @@ u32 x86_int13_hanler_C(u32 eax, u32 ebx, u32 ecx, u32 edx) {
         case 0x15:
             return handle_int13_15(edx);
     }
-    /// TODO: remove it
-    goutf(TEXTMODE_ROWS - 1, false, "x86_int13_hanler_C(%08X, %08X, %08X, %08X) ret 1", eax, ebx, ecx, edx);
     return disk_ret(DISK_RET_EPARAM);
 }

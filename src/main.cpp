@@ -266,7 +266,7 @@ extern "C" {
 void process_mouse_report(hid_mouse_report_t const * report)
 {
     mouse_buttons = report->buttons;
-    goutf(TEXTMODE_ROWS - 2, false, "Mouse X: %d Y: %d Wheel: %02Xh Buttons: %02Xh         ", report->x, report->y, report->wheel, report->buttons);
+    goutf(current_video_mode_height - 2, false, "Mouse X: %d Y: %d Wheel: %02Xh Buttons: %02Xh         ", report->x, report->y, report->wheel, report->buttons);
   /*
   //------------- button state  -------------//
   uint8_t button_changed_mask = report->buttons ^ prev_report.buttons;
@@ -298,7 +298,7 @@ void __not_in_flash_func(process_kbd_report)(
     hid_keyboard_report_t const *report,
     hid_keyboard_report_t const *prev_report
 ) {
-    goutf(TEXTMODE_ROWS - 3, false, "HID modifiers: %02Xh                                ", report->modifier);
+    goutf(current_video_mode_height - 3, false, "HID modifiers: %02Xh                                ", report->modifier);
     pressed_key[HID_KEY_ALT_LEFT] = report->modifier & KEYBOARD_MODIFIER_LEFTALT;
     pressed_key[HID_KEY_ALT_RIGHT] = report->modifier & KEYBOARD_MODIFIER_RIGHTALT;
     pressed_key[HID_KEY_CONTROL_LEFT] = report->modifier & KEYBOARD_MODIFIER_LEFTCTRL;
@@ -315,7 +315,7 @@ void __not_in_flash_func(process_kbd_report)(
         if (!key_still_pressed) {
          ///   kbd_queue_push(pressed_key[pkc], false);
             pressed_key[pkc] = 0;
-            goutf(TEXTMODE_ROWS - 3, false, "Release hid_code: %02Xh modifiers: %02Xh            ", pkc, report->modifier);
+            goutf(current_video_mode_height - 3, false, "Release hid_code: %02Xh modifiers: %02Xh            ", pkc, report->modifier);
         }
     }
     for (uint8_t kc: report->keycode) {
@@ -327,7 +327,7 @@ void __not_in_flash_func(process_kbd_report)(
             if (hid_code != 0) {
                 *pk = hid_code;
             ///    kbd_queue_push(hid_code, true);
-                goutf(TEXTMODE_ROWS - 3, false, "Hit hid_code: %02Xh modifiers: %02Xh             ", hid_code, report->modifier);
+                goutf(current_video_mode_height - 3, false, "Hit hid_code: %02Xh modifiers: %02Xh             ", hid_code, report->modifier);
             }
         }
     }
@@ -393,8 +393,8 @@ void __time_critical_func(render_core)() {
     graphics_set_offset(0, 0);
     graphics_set_flashmode(false, false);
     graphics_set_mode(TEXTMODE_DEFAULT);
-    graphics_set_buffer(buffer, TEXTMODE_COLS, TEXTMODE_ROWS);
-    graphics_set_textbuffer(buffer);
+//    graphics_set_buffer(buffer, TEXTMODE_COLS, TEXTMODE_ROWS);
+//    graphics_set_textbuffer(buffer);
     clrScr(0);
     sem_acquire_blocking(&vga_start_semaphore);
 #ifdef HDMIA
@@ -869,7 +869,17 @@ int main() {
 
     int links = testPins(VGA_BASE_PIN, VGA_BASE_PIN + 1);
     SELECT_VGA = (links == 0) || (links == 0x1F);
-
+    if (SELECT_VGA) {
+        current_video_mode = 3;
+        current_video_mode_width = 80;
+        current_video_mode_height = 25;
+    } else {
+        current_video_mode = 0;
+        current_video_mode_width = 80;
+        current_video_mode_height = 25;
+    }
+    VGA_FRAMBUFFER_WINDOW_SIZE = current_video_mode_width * current_video_mode_height * 2;
+    
     sem_init(&vga_start_semaphore, 0, 1);
     multicore_launch_core1(render_core);
     sem_release(&vga_start_semaphore);

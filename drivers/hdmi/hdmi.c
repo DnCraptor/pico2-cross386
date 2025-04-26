@@ -9,6 +9,9 @@
 #include "pico/multicore.h"
 #include "hardware/clocks.h"
 
+#define TEXTMODE_COLS 53
+#define TEXTMODE_ROWS 30
+
 //PIO параметры
 static uint offs_prg0 = 0;
 static uint offs_prg1 = 0;
@@ -27,9 +30,9 @@ static uint32_t palette[256];
 #define SCREEN_WIDTH (320)
 #define SCREEN_HEIGHT (240)
 //графический буфер
-static uint8_t* __scratch_y("hdmi_ptr_1") graphics_buffer = NULL;
-static int graphics_buffer_width = 0;
-static int graphics_buffer_height = 0;
+static uint8_t* __scratch_y("hdmi_ptr_1") graphics_buffer = SCREEN;
+static int graphics_buffer_width = 320;
+static int graphics_buffer_height = 240;
 static int graphics_buffer_shift_x = 0;
 static int graphics_buffer_shift_y = 0;
 
@@ -608,8 +611,3 @@ void graphics_set_offset_hdmi(int x, int y) {
     graphics_buffer_shift_x = x;
     graphics_buffer_shift_y = y;
 };
-
-void clrScr_hdmi(const uint8_t color) {
-    if (text_buffer)
-        memset(text_buffer, color, TEXTMODE_COLS * TEXTMODE_ROWS * 2);
-}
