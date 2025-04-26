@@ -83,6 +83,7 @@ void draw_window(const char* title, uint32_t x, uint32_t y, uint32_t width, uint
 void clrScr_hdmi(uint8_t color);
 void clrScr(uint8_t color);
 
+extern bool SELECT_VGA;
 void handle_frame_changed();
 extern uint8_t SCREEN[256l << 10]; // Emulate 256 KB of frame-buffer
 // in PSRAM:

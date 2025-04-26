@@ -161,7 +161,6 @@ static void pio_set_x(PIO pio, const int sm, uint32_t v) {
     pio_sm_exec(pio, sm, instr_mov);
 }
 
-
 static void __scratch_y("hdmi_driver") dma_handler_HDMI() {
     static uint32_t inx_buf_dma;
     static uint line = 0;
@@ -172,7 +171,10 @@ static void __scratch_y("hdmi_driver") dma_handler_HDMI() {
 
     line = line >= 524 ? 0 : line + 1;
 
-    if ((line & 1) == 0) return;
+    if ((line & 1) == 0) {
+        if (!line) handle_frame_changed();
+        return;
+    }
 
     inx_buf_dma++;
 

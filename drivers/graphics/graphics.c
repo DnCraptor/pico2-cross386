@@ -1,7 +1,7 @@
 #include "graphics.h"
 #include <string.h>
 
-extern volatile bool SELECT_VGA;
+bool SELECT_VGA = true;
 
 uint8_t SCREEN[256l << 10]; // Emulate 256 KB of frame-buffer - real buffer
 // in PSRAM:

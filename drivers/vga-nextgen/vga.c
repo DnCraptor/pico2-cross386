@@ -12,8 +12,6 @@
 #include "pico/stdlib.h"
 #include "stdlib.h"
 
-extern volatile bool SELECT_VGA;
-
 uint16_t pio_program_VGA_instructions[] = {
     //     .wrap_target
     0x6008, //  0: out    pins, 8
