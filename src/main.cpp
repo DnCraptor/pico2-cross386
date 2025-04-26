@@ -53,7 +53,7 @@ extern "C" void goutf(int outline, bool err, const char *__restrict str, ...) {
     va_start(ap, str);
     vsnprintf(buf, 80, str, ap);
     va_end(ap);
-    draw_text(buf, 0, outline, err ? 12 : 7, 0);
+    draw_debug_text(buf, 0, outline, err ? 12 : 7, 0);
 }
 
 struct input_bits_t {
@@ -387,6 +387,7 @@ static inline void __dvi_func_x(_dvi_prepare_scanline_16bpp)(struct dvi_inst *in
 
 void __time_critical_func(render_core)() {
     multicore_lockout_victim_init();
+    clrBuf();
     graphics_init();
     const auto buffer = (uint8_t *)SCREEN;
     graphics_set_bgcolor(0x000000);
@@ -927,31 +928,7 @@ int main() {
     #ifdef BUTTER_PSRAM_GPIO
     uint32_t psram32 = butter_psram_size();
     no_butterbod = psram32 == 0;
-    goutf(y++, true, "Murmulator VGA/HDMI BIOS for RP2350 378 MHz 1.6V");
-    goutf(y++, false, "PSRAM (on GPIO-%d) %d MB", BUTTER_PSRAM_GPIO, psram32 >> 20);
-    if (0){
-        uint32_t a = 0;
-        uint32_t elapsed;
-        uint32_t begin = time_us_32();
-        double d = 1.0;
-        double speedw, speedr;
-        for (; a < psram32; ++a) {
-            PSRAM_DATA[a] =  a & 0xFF;
-        }
-        elapsed = time_us_32() - begin;
-        speedw = d * a / elapsed;
-        goutf(y++, false, " 8-bit line write speed: %f MBps", speedw);
-        begin = time_us_32();
-        for (a = 0; a < psram32; ++a) {
-            if ((a & 0xFF) != PSRAM_DATA[a]) {
-                goutf(y++, false, " PSRAM read failed at %ph", PSRAM_DATA+a);
-                break;
-            }
-        }
-        elapsed = time_us_32() - begin;
-        speedr = d * a / elapsed;
-        goutf(y++, false, " 8-bit line read speed: %f MBps", speedr);
-    }
+    goutf(0, true, "Murmulator VGA/HDMI BIOS for RP2350 378 MHz 1.6V");
     {
         uint32_t a = 0;
         uint32_t elapsed;
@@ -964,17 +941,16 @@ int main() {
         }
         elapsed = time_us_32() - begin;
         speedw = d * a * sizeof(uint32_t) / elapsed;
-        goutf(y++, false, "32-bit line write speed: %f MBps", speedw);
         begin = time_us_32();
         for (a = 0; a < psram32 / sizeof(uint32_t); ++a) {
             if (a  != p32[a]) {
-                goutf(y++, false, " PSRAM 32-bit read failed at %ph", p32+a);
-                break;
+                goutf(1, true, " PSRAM write/read test failed at %ph", p32 + a);
+                goto skip_it;
             }
         }
         elapsed = time_us_32() - begin;
         speedr = d * a * sizeof(uint32_t) / elapsed;
-        goutf(y++, false, "32-bit line read speed: %f MBps", speedr);
+        goutf(1, false, "PSRAM (on GPIO-%d) %d MB %f/%f MBps", BUTTER_PSRAM_GPIO, psram32 >> 20, speedw, speedr);
     }
 
     #endif
@@ -1027,15 +1003,11 @@ skip_it:
         gpio_put(PICO_DEFAULT_LED_PIN, false);
     }
 
-    // init interrupts
-    volatile uint32_t* X86_BASE_RAM = (uint32_t*)PSRAM_DATA;
-    for (int i = 0; i < 256; ++i) {
-        X86_BASE_RAM[i] = (uint32_t)&x86_iret;
-    }
-    X86_BASE_RAM[0x10] = (uint32_t)&x86_int10_hanler;
-    X86_BASE_RAM[0x13] = (uint32_t)&x86_int13_hanler;
+    x86_init();
+
+    y = 0;
     u32 eax = x86_int10(0, 0, 0, 0);
-    goutf(y++, false, "INT 10 AH=0 rc: %08X", eax);
+    goutf(30-1, false, "INT 10 AH=0 rc: %08X", eax);
 #if 0
     u32 eax = x86_int13(0, 0, 0, 0);
     goutf(y++, false, "INT 13 AH=0 rc: %08X", eax);

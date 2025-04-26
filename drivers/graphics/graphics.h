@@ -75,10 +75,14 @@ void draw_text(const char* string, uint32_t x, uint32_t y, uint8_t color, uint8_
 void draw_window(const char* title, uint32_t x, uint32_t y, uint32_t width, uint32_t height);
 
 void clrScr(uint8_t color);
+void clrBuf(void);
 
 extern bool SELECT_VGA;
 extern uint32_t current_video_mode;
 extern uint32_t text_cursor_type;
+extern uint8_t text_cursor_row;
+extern uint8_t text_cursor_column;
+
 extern uint32_t current_video_mode_width;
 extern uint32_t current_video_mode_height;
 void handle_frame_changed();
@@ -87,7 +91,9 @@ extern uint8_t SCREEN[256l << 10]; // Emulate 256 KB of frame-buffer
 extern uint32_t VGA_FRAMBUFFER_WINDOW_START;
 extern uint32_t VGA_FRAMBUFFER_WINDOW_SIZE;
 
+/// to show data in debug ares
 void goutf(int outline, bool err, const char *__restrict str, ...);
+void draw_debug_text(const char* string, uint32_t x, uint32_t y, uint8_t color, uint8_t bgcolor);
 
 #ifdef __cplusplus
 }
