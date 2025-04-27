@@ -895,92 +895,9 @@ e0:
     return res;
 }
 
-
-inline static u32 x86_int10(u32 eax, u32 ebx, u32 ecx, u32 edx) {
-    register u32 in_eax __asm__("r0") = eax;
-    register u32 in_ebx __asm__("r1") = ebx;
-    register u32 in_ecx __asm__("r2") = ecx;
-    register u32 in_edx __asm__("r3") = edx;
-    register u32 result __asm__("r0"); // результат будет в r0
-    __asm__ volatile (
-        "  push {r1-r12, lr}\n"         // Сохраняем рабочие регистры (r1-r12, lr)
-        "  mov  r4, r0\n"               // r4 = EAX
-        "  mov  r5, r1\n"               // r5 = EBX
-        "  mov  r6, r2\n"               // r6 = ECX
-        "  mov  r7, r3\n"               // r7 = EDX
-        "  CPSID i\n"                   // Запрет прерываний
-        "  adr  r11, 1f\n"              // Адрес возврата (метка 1)
-        "  mrs  r12, apsr\n"            // Сохраняем флаги
-        "  push {r11, r12}\n"           // Эмулируем PUSH IP, PUSH FLAGS
-        "  ldr  r11, =0x11000040\n"     // Адрес обработчика INT 10h
-        "  ldr  r11, [r11]\n"
-        "  mov  pc, r11\n"              // Переход к обработчику
-        "1:\n"                          // Метка возврата
-        "  mov  r0, r4\n"               // В r0 результат (из r4)
-        "  pop  {r1-r12, lr}\n"          // Восстанавливаем сохранённые регистры
-        :
-        : "r"(in_eax), "r"(in_ebx), "r"(in_ecx), "r"(in_edx)
-        : "r4", "r5", "r6", "r7", "r11", "r12", "memory"
-    );
-    return result;
-}
-
-inline static u32 x86_int13(u32 eax, u32 ebx, u32 ecx, u32 edx) {
-    register u32 in_eax __asm__("r0") = eax;
-    register u32 in_ebx __asm__("r1") = ebx;
-    register u32 in_ecx __asm__("r2") = ecx;
-    register u32 in_edx __asm__("r3") = edx;
-    register u32 result __asm__("r0"); // результат будет в r0
-    __asm__ volatile (
-        "  push {r1-r12, lr}\n"         // Сохраняем рабочие регистры (r1-r12, lr)
-        "  mov  r4, r0\n"               // r4 = EAX
-        "  mov  r5, r1\n"               // r5 = EBX
-        "  mov  r6, r2\n"               // r6 = ECX
-        "  mov  r7, r3\n"               // r7 = EDX
-        "  CPSID i\n"                   // Запрет прерываний
-        "  adr  r11, 1f\n"              // Адрес возврата (метка 1)
-        "  mrs  r12, apsr\n"            // Сохраняем флаги
-        "  push {r11, r12}\n"           // Эмулируем PUSH IP, PUSH FLAGS
-        "  ldr  r11, =0x1100004C\n"     // Адрес обработчика INT 13h
-        "  ldr  r11, [r11]\n"
-        "  mov  pc, r11\n"              // Переход к обработчику
-        "1:\n"                          // Метка возврата
-        "  mov  r0, r4\n"               // В r0 результат (из r4)
-        "  pop  {r1-r12, lr}\n"          // Восстанавливаем сохранённые регистры
-        :
-        : "r"(in_eax), "r"(in_ebx), "r"(in_ecx), "r"(in_edx)
-        : "r4", "r5", "r6", "r7", "r11", "r12", "memory"
-    );
-    return result;
-}
-
-inline static u32 x86_int16(u32 eax, u32 ebx, u32 ecx, u32 edx) {
-    register u32 in_eax __asm__("r0") = eax; // результат тоже будет в r0
-    register u32 in_ebx __asm__("r1") = ebx;
-    register u32 in_ecx __asm__("r2") = ecx;
-    register u32 in_edx __asm__("r3") = edx;
-    __asm__ volatile (
-        "  push {r1-r12, lr}\n"         // Сохраняем рабочие регистры (r1-r12, lr)
-        "  mov  r4, r0\n"               // r4 = EAX
-        "  mov  r5, r1\n"               // r5 = EBX
-        "  mov  r6, r2\n"               // r6 = ECX
-        "  mov  r7, r3\n"               // r7 = EDX
-        "  CPSID i\n"                   // Запрет прерываний
-        "  adr  r11, 1f\n"              // Адрес возврата (метка 1)
-        "  mrs  r12, apsr\n"            // Сохраняем флаги
-        "  push {r11, r12}\n"           // Эмулируем PUSH IP, PUSH FLAGS
-        "  ldr  r11, =0x11000058\n"     // Адрес обработчика INT 16h
-        "  ldr  r11, [r11]\n"
-        "  mov  pc, r11\n"              // Переход к обработчику
-        "1:\n"                          // Метка возврата
-        "  mov  r0, r4\n"               // В r0 результат (из r4)
-        "  pop  {r1-r12, lr}\n"          // Восстанавливаем сохранённые регистры
-        :
-        : "r"(in_eax), "r"(in_ebx), "r"(in_ecx), "r"(in_edx)
-        : "r4", "r5", "r6", "r7", "r11", "r12", "memory"
-    );
-    return in_eax;
-}
+extern "C" uint32_t x86_int10_wrapper(uint32_t eax, uint32_t ebx, uint32_t ecx, uint32_t edx) __attribute__((pcs("aapcs")));
+extern "C" uint32_t x86_int13_wrapper(uint32_t eax, uint32_t ebx, uint32_t ecx, uint32_t edx) __attribute__((pcs("aapcs")));
+extern "C" uint32_t x86_int16_wrapper(uint32_t eax, uint32_t ebx, uint32_t ecx, uint32_t edx) __attribute__((pcs("aapcs")));
 
 static void format_hdd_test(int y) {
     u32 total_tracks = 512;          // Максимальное количество дорожек
@@ -989,7 +906,7 @@ static void format_hdd_test(int y) {
 
     u8* buff = X86_FAR_PTR(X86_ES, 0x1000);  // Буфер для форматирования
 
-    for (u32 track = 510; track < total_tracks; ++track) {
+    for (u32 track = 0; track < total_tracks; ++track) {
         for (u32 head = 0; head < heads; ++head) {
             // Заполняем буфер F/N парами
             for (u32 sector = 0; sector < sectors_per_track; ++sector) {
@@ -1007,9 +924,9 @@ static void format_hdd_test(int y) {
             u32 ecx = (ch << 8) | cl;                 // CH:CL
             u32 edx = (head << 8) | 0x80;             // DH:DL
 
-            u32 status = x86_int13(eax, ebx, ecx, edx);
+            u32 status = x86_int13_wrapper(eax, ebx, ecx, edx);
 
-            goutf(0, false, "INT 13 AH=5 format [%d:%d:1-63] rc: %08X", track, head, status);
+            goutf(y, false, "INT 13 AH=5 format [%d:%d:1-63] rc: %08X", track, head, status);
             if (status) return;
         }
     }
@@ -1291,15 +1208,20 @@ skip_it:
 
     x86_init();
 
-    u32 eax = x86_int10(0x0003, 0, 0, 0); // try mode 3
+    format_hdd_test(0);
+
+    u32 eax = x86_int10_wrapper(0x0003, 0, 0, 0); // try mode 3
     u32 i = 0;
     while(1) {
-        eax = x86_int16(0, 0, 0, 0);
+        eax = x86_int16_wrapper(0, 0, 0, 0);
      //   goutf(30-3, false, "INT 16 AH=00 rc: %08X (%d)", eax, i++);
       //  if (eax)
         //    sleep_ms(1000);
       //  else
-            sleep_ms(20);
+      static int i = 0;
+      u8 ascii = (u8)eax;
+      u8 scan = (u8)(eax >> 8);
+      goutf(30-3, false, "R %02X[%c]/%02X (%d)", ascii, ascii, scan, i++);
     }
 #if 0
     u32 eax = x86_int10(0x0000, 0, 0, 0); // try mode 0

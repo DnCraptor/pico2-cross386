@@ -27,8 +27,6 @@ inline static u32 x86_int16_00() {
     // Получаем ASCII-код (AL) и scan-код (AH)
     u8 ascii = (u8)keydata;
     u8 scan = (u8)(keydata >> 8);
-    static int i = 0;
-    goutf(30-3, false, "R %02X[%c]/%02X (%d)", ascii, ascii, scan, i++);
     BDA16[0] = head + 1;
     return keydata;
 }
