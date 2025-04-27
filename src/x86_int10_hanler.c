@@ -85,6 +85,7 @@ if (mode <= 5 || mode == 7) {
             graphics_set_mode(TEXTMODE_53x30);
             break;
         case 3:
+            if (!SELECT_VGA) goto e;
             current_video_mode = AL;
             current_video_mode_width = 80;
             current_video_mode_height = 25;
@@ -92,7 +93,8 @@ if (mode <= 5 || mode == 7) {
             break;
         default:
     }
-    VGA_FRAMBUFFER_WINDOW_SIZE = current_video_mode_width * current_video_mode_height;
+e:
+    VGA_FRAMBUFFER_WINDOW_SIZE = current_video_mode_width * current_video_mode_height * 2;
     u8* BDA = X86_FAR_PTR(0x0040, 0x0064);
     *BDA = current_video_mode; // 0x0464	1 байт	Режим работы видеоадаптера (номер режима)
     u16* BDA16 = (u16*)(BDA + 1); // 465h
@@ -101,7 +103,7 @@ if (mode <= 5 || mode == 7) {
     BDA16[2] = current_video_mode_height - 1; // 0x0469	2 байта	Количество строк на экране (минус 1)
     BDA16[3] = current_video_mode_width * 2; // 0x046B	2 байта	Количество байт на строку
     clrScr(0);
-    return 0x30; 
+    return 0x30;
 }
 
 /**
@@ -560,5 +562,5 @@ u32 x86_int10_hanler_C(u32 eax, u32 ebx, u32 ecx, u32 edx) {
         case 0x0F:
             return x86_int10_hanler_0F();
     }
-    return 0;
+    return 0xFF00 | CF_ON;
 }

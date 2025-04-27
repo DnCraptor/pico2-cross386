@@ -857,7 +857,7 @@ int main() {
         current_video_mode_height = 25;
     } else {
         current_video_mode = 0;
-        current_video_mode_width = 80;
+        current_video_mode_width = 40;
         current_video_mode_height = 25;
     }
     VGA_FRAMBUFFER_WINDOW_SIZE = current_video_mode_width * current_video_mode_height * 2;
@@ -967,8 +967,10 @@ skip_it:
 
     x86_init();
 
-    u32 eax = x86_int10(0, 0, 0, 0);
-    goutf(30-3, false, "INT 10 AH=0 rc: %08X", eax);
+    u32 eax = x86_int10(0x0000, 0, 0, 0); // try mode 0
+    eax = x86_int10(0x0003, 0, 0, 0); // try mode 3
+    eax = x86_int10(0x0F00, 0, 0, 0); // show mode in result
+    goutf(30-3, false, "INT 10 AH=0F rc: %08X", eax);
 #if 0
     u32 eax = x86_int13(0, 0, 0, 0);
     goutf(y++, false, "INT 13 AH=0 rc: %08X", eax);
