@@ -402,9 +402,134 @@ inline static u32 x86_int10_hanler_09(u32 eax, u32 ebx, u32 ecx) {
             break;
         }
     }
-r:
     BDA[BH] = (row << 8) | column;
     return 0;
+}
+
+/**
+ * VIDEO - WRITE CHARACTER ONLY AT CURSOR POSITION
+ * AH = 0Ah
+ * AL = character to display
+ * BH = page number (00h to number of pages - 1) (see #00010)
+ * background color in 256-color graphics modes (ET4000)
+ * BL = attribute (PCjr, Tandy 1000 only) or color (graphics mode)
+ * if bit 7 set in <256-color graphics mode, character is XOR'ed onto screen
+ * CX = number of times to write character
+ * Returns: Nothing
+ */
+inline static u32 x86_int10_hanler_0A(u32 eax, u32 ebx, u32 ecx) {
+    if (BH > 7) return 0;
+    u16* BDA = (u16*)X86_FAR_PTR(0x0040, 0x0050);
+    u16 edx = BDA[BH];
+    u16 row = DH;
+    u16 column = DL;
+    u8* b1 = (u8*)VGA_FRAMBUFFER_WINDOW_START;
+    b1 += BH * VGA_FRAMBUFFER_WINDOW_SIZE;
+    u16 width = current_video_mode_width;
+    u16 heigh = current_video_mode_height;
+    u16* b16 = (u16*)b1;
+    b16 += width * row + column;
+    for (u16 i = 0; i < CX; ++i) {
+        u16 c = (*b16 & 0xFF00) | AL;
+        *b16++ = c;
+        ++column;
+        if (column >= width) {
+            column = 0;
+            ++row;
+        }
+        if (row >= heigh) {
+            break;
+        }
+    }
+    BDA[BH] = (row << 8) | column;
+    return 0;
+}
+
+/**
+ * VIDEO - TELETYPE OUTPUT
+ * AH = 0Eh
+ * AL = character to write
+ * BH = page number
+ * BL = foreground color (graphics modes only)
+ * Return: Nothing
+ * Desc: Display a character on the screen, advancing the cursor and scrolling the screen as necessary
+ */
+inline static u32 x86_int10_hanler_0E(u32 eax, u32 ebx) {
+    if (BH > 7) return 0;
+
+    // Получить позицию курсора из BDA
+    u16* BDA = (u16*)X86_FAR_PTR(0x0040, 0x0050);
+    u16 edx = BDA[BH];
+    u16 row = DH;
+    u16 column = DL;
+
+    // Базовый адрес видеопамяти для страницы
+    u8* b1 = (u8*)VGA_FRAMBUFFER_WINDOW_START;
+    b1 += BH * VGA_FRAMBUFFER_WINDOW_SIZE;
+
+    u16 width = current_video_mode_width;
+    u16 height = current_video_mode_height;
+    u16* b16 = (u16*)b1;
+    b16 += width * row + column;
+
+    // Записать символ
+    u16 c = (*b16 & 0xFF00) | AL;  // сохранить атрибут, заменить символ
+    *b16 = c;
+
+    // Переместить курсор вправо
+    ++column;
+    if (column >= width) {
+        column = 0;
+        ++row;
+        if (row >= height) {
+            row = height - 1;
+            // Скроллинг: сдвинуть всю память экрана на одну строку вверх
+            u16* vram = (u16*)b1;
+            memcpy(vram, vram + width, (height - 1) * width * sizeof(u16));
+            // Очистить последнюю строку пробелами с атрибутом
+            u16 blank = (c & 0xFF00) | ' ';
+            u16* last_line = vram + (height - 1) * width;
+            for (u16 i = 0; i < width; ++i) {
+                last_line[i] = blank;
+            }
+            --row;
+        }
+    }
+
+    // Сохранить новую позицию курсора
+    BDA[BH] = (row << 8) | column;
+    return 0;
+}
+
+/**
+ * VIDEO - GET CURRENT VIDEO MODE
+ * AH = 0Fh
+ * 
+ * Returns:
+ * AH = number of character columns
+ * AL = display mode (see #00010 at AH=00h)
+ * BH = active page (see AH=05h)
+ * Notes: If mode was set with bit 7 set ("no blanking"), the returned mode will also have bit 7 set. EGA, VGA, and UltraVision return either AL=03h (color) or AL=07h (monochrome) in all extended-row text modes. HP 200LX returns AL=07h (monochrome) if mode was set to AL=21h and always 80 resp. 40 columns in all text modes regardless of current zoom setting (see AH=D0h). When using a Hercules Graphics Card, additional checks are necessary:
+
+mode 05h:
+If WORD 0040h:0063h is 03B4h, may be in graphics page 1
+(as set by DOSSHELL and other Microsoft software)
+
+mode 06h:
+If WORD 0040h:0063h is 03B4h, may be in graphics page 0
+(as set by DOSSHELL and other Microsoft software)
+
+mode 07h:
+If BYTE 0040h:0065h bit 1 is set, Hercules card is in
+graphics mode, with bit 7 indicating the page (mode set by
+Hercules driver for Borland Turbo C).
+The Tandy 2000 BIOS is only documented as returning AL, not AH or BH
+ */
+inline static u32 x86_int10_hanler_0F(void) {
+    register u32 eax = (current_video_mode_width << 8) | current_video_mode;
+    u32 ebx = text_page;
+    __asm volatile ("mov r5, %0" :: "r"(ebx): "r5");
+    return eax;
 }
 
 u32 x86_int10_hanler_C(u32 eax, u32 ebx, u32 ecx, u32 edx) {
@@ -428,6 +553,12 @@ u32 x86_int10_hanler_C(u32 eax, u32 ebx, u32 ecx, u32 edx) {
             return x86_int10_hanler_08(ebx);
         case 9:
             return x86_int10_hanler_09(eax, ebx, ecx);
+        case 0x0A:
+            return x86_int10_hanler_0A(eax, ebx, ecx);
+        case 0x0E:
+            return x86_int10_hanler_0E(eax, ebx);
+        case 0x0F:
+            return x86_int10_hanler_0F();
     }
     return 0;
 }
