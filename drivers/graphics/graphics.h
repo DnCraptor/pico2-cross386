@@ -83,6 +83,8 @@ extern uint32_t text_cursor_type;
 extern uint8_t text_cursor_row;
 extern uint8_t text_cursor_column;
 extern uint8_t text_page;
+extern uint8_t border_color;
+extern uint8_t paletteID;
 
 extern uint32_t current_video_mode_width;
 extern uint32_t current_video_mode_height;

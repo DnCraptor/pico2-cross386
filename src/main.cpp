@@ -7,6 +7,11 @@
 #include <hardware/clocks.h>
 #include <hardware/flash.h>
 #include <hardware/watchdog.h>
+#include <hardware/structs/qmi.h>
+#include <hardware/structs/xip.h>
+#include <hardware/exception.h>
+#include <hardware/structs/qmi.h>
+#include <hardware/structs/xip.h>
 #include <pico/bootrom.h>
 #include <pico/multicore.h>
 #include <pico/stdlib.h>
@@ -50,11 +55,6 @@ struct input_bits_t {
 
 input_bits_t gamepad1_bits = { false, false, false, false, false, false, false, false };
 
-#if PICO_RP2040
-volatile static bool no_butterbod = true;
-#else
-volatile static bool no_butterbod = false;
-#endif
 volatile static uint8_t pressed_key[256] = { 0 };
 volatile static uint8_t mouse_buttons = 0;
 volatile static bool i2s_1nit = false;
@@ -83,9 +83,6 @@ inline bool isInterrupted() {
     return isSpeaker() || isI2S();
 }
 
-#if !PICO_RP2040
-#include <hardware/structs/qmi.h>
-#include <hardware/structs/xip.h>
 volatile uint8_t * PSRAM_DATA = (uint8_t*)X86_RAM_BASE;
 void __no_inline_not_in_flash_func(psram_init)(uint cs_pin) {
     gpio_set_function(cs_pin, GPIO_FUNC_XIP_CS1);
@@ -161,7 +158,6 @@ void __no_inline_not_in_flash_func(psram_init)(uint cs_pin) {
     // Enable writes to PSRAM
     hw_set_bits(&xip_ctrl_hw->ctrl, XIP_CTRL_WRITABLE_M1_BITS);
 }
-#endif
 
 extern "C" {
     #include "audio.h"
@@ -247,7 +243,7 @@ extern "C" {
 void process_mouse_report(hid_mouse_report_t const * report)
 {
     mouse_buttons = report->buttons;
-    goutf(current_video_mode_height - 2, false, "Mouse X: %d Y: %d Wheel: %02Xh Buttons: %02Xh         ", report->x, report->y, report->wheel, report->buttons);
+///    goutf(current_video_mode_height - 2, false, "Mouse X: %d Y: %d Wheel: %02Xh Buttons: %02Xh         ", report->x, report->y, report->wheel, report->buttons);
   /*
   //------------- button state  -------------//
   uint8_t button_changed_mask = report->buttons ^ prev_report.buttons;
@@ -264,6 +260,194 @@ void process_mouse_report(hid_mouse_report_t const * report)
   */
 }
 
+extern Ps2Kbd_Mrmltr ps2kbd;
+
+inline static 
+uint8_t convert_keycode_to_scan(uint8_t keycode) {
+    switch (keycode) {
+        // Алфавитные клавиши
+        case HID_KEY_A: return 0x1E;
+        case HID_KEY_B: return 0x30;
+        case HID_KEY_C: return 0x2E;
+        case HID_KEY_D: return 0x20;
+        case HID_KEY_E: return 0x12;
+        case HID_KEY_F: return 0x21;
+        case HID_KEY_G: return 0x22;
+        case HID_KEY_H: return 0x23;
+        case HID_KEY_I: return 0x17;
+        case HID_KEY_J: return 0x24;
+        case HID_KEY_K: return 0x25;
+        case HID_KEY_L: return 0x26;
+        case HID_KEY_M: return 0x32;
+        case HID_KEY_N: return 0x31;
+        case HID_KEY_O: return 0x18;
+        case HID_KEY_P: return 0x19;
+        case HID_KEY_Q: return 0x10;
+        case HID_KEY_R: return 0x13;
+        case HID_KEY_S: return 0x1F;
+        case HID_KEY_T: return 0x14;
+        case HID_KEY_U: return 0x16;
+        case HID_KEY_V: return 0x2F;
+        case HID_KEY_W: return 0x11;
+        case HID_KEY_X: return 0x2D;
+        case HID_KEY_Y: return 0x15;
+        case HID_KEY_Z: return 0x2C;
+        
+        // Цифры
+        case HID_KEY_1: return 0x02;
+        case HID_KEY_2: return 0x03;
+        case HID_KEY_3: return 0x04;
+        case HID_KEY_4: return 0x05;
+        case HID_KEY_5: return 0x06;
+        case HID_KEY_6: return 0x07;
+        case HID_KEY_7: return 0x08;
+        case HID_KEY_8: return 0x09;
+        case HID_KEY_9: return 0x0A;
+        case HID_KEY_0: return 0x0B;
+        
+        // Специальные клавиши
+        case HID_KEY_ENTER: return 0x1C;
+        case HID_KEY_BACKSPACE: return 0x0E;
+        case HID_KEY_TAB: return 0x0F;
+        case HID_KEY_SPACE: return 0x39;
+        case HID_KEY_MINUS: return 0x0C;
+        case HID_KEY_EQUAL: return 0x0D;
+        case HID_KEY_BRACKET_LEFT: return 0x1A;
+        case HID_KEY_BRACKET_RIGHT: return 0x1B;
+        case HID_KEY_BACKSLASH: return 0x2B;
+        case HID_KEY_SEMICOLON: return 0x27;
+        case HID_KEY_APOSTROPHE: return 0x28;
+        case HID_KEY_GRAVE: return 0x29;
+        case HID_KEY_COMMA: return 0x33;
+        case HID_KEY_PERIOD: return 0x34;
+        case HID_KEY_SLASH: return 0x35;
+        
+        // Клавиши управления
+        case HID_KEY_CAPS_LOCK: return 0x3A;
+        case HID_KEY_F1: return 0x3B;
+        case HID_KEY_F2: return 0x3C;
+        case HID_KEY_F3: return 0x3D;
+        case HID_KEY_F4: return 0x3E;
+        case HID_KEY_F5: return 0x3F;
+        case HID_KEY_F6: return 0x40;
+        case HID_KEY_F7: return 0x41;
+        case HID_KEY_F8: return 0x42;
+        case HID_KEY_F9: return 0x43;
+        case HID_KEY_F10: return 0x44;
+        case HID_KEY_F11: return 0x45;
+        case HID_KEY_F12: return 0x46;
+        case HID_KEY_PRINT_SCREEN: return 0x54;
+        case HID_KEY_SCROLL_LOCK: return 0x47;
+        case HID_KEY_PAUSE: return 0x48;
+        
+        // Стрелочные клавиши
+        case HID_KEY_ARROW_UP: return 0x52;
+        case HID_KEY_ARROW_DOWN: return 0x51;
+        case HID_KEY_ARROW_LEFT: return 0x50;
+        case HID_KEY_ARROW_RIGHT: return 0x4F;
+        
+        // Клавиши для работы с окнами
+        case HID_KEY_INSERT: return 0x49;
+        case HID_KEY_HOME: return 0x4A;
+        case HID_KEY_PAGE_UP: return 0x4B;
+        case HID_KEY_DELETE: return 0x4C;
+        case HID_KEY_END: return 0x4D;
+        case HID_KEY_PAGE_DOWN: return 0x4E;
+        
+        // Клавиши на цифровой панели
+        case HID_KEY_KEYPAD_1: return 0x59;
+        case HID_KEY_KEYPAD_2: return 0x5A;
+        case HID_KEY_KEYPAD_3: return 0x5B;
+        case HID_KEY_KEYPAD_4: return 0x5C;
+        case HID_KEY_KEYPAD_5: return 0x5D;
+        case HID_KEY_KEYPAD_6: return 0x5E;
+        case HID_KEY_KEYPAD_7: return 0x5F;
+        case HID_KEY_KEYPAD_8: return 0x60;
+        case HID_KEY_KEYPAD_9: return 0x61;
+        case HID_KEY_KEYPAD_0: return 0x62;
+        case HID_KEY_KEYPAD_DECIMAL: return 0x63;
+        case HID_KEY_KEYPAD_ENTER: return 0x58;
+        
+        // Дополнительные клавиши
+        case HID_KEY_APPLICATION: return 0x65;
+        case HID_KEY_POWER: return 0x66;
+        case HID_KEY_KEYPAD_EQUAL: return 0x67;
+        case HID_KEY_F13: return 0x68;
+        case HID_KEY_F14: return 0x69;
+        case HID_KEY_F15: return 0x6A;
+        case HID_KEY_F16: return 0x6B;
+        case HID_KEY_F17: return 0x6C;
+        case HID_KEY_F18: return 0x6D;
+        case HID_KEY_F19: return 0x6E;
+        case HID_KEY_F20: return 0x6F;
+        case HID_KEY_F21: return 0x70;
+        case HID_KEY_F22: return 0x71;
+        case HID_KEY_F23: return 0x72;
+        case HID_KEY_F24: return 0x73;
+        
+        // Резерв
+        case HID_KEY_CONTROL_LEFT: return 0xE0;
+        case HID_KEY_SHIFT_LEFT: return 0xE1;
+        case HID_KEY_ALT_LEFT: return 0xE2;
+        case HID_KEY_GUI_LEFT: return 0xE3;
+        case HID_KEY_CONTROL_RIGHT: return 0xE4;
+        case HID_KEY_SHIFT_RIGHT: return 0xE5;
+        case HID_KEY_ALT_RIGHT: return 0xE6;
+        case HID_KEY_GUI_RIGHT: return 0xE7;
+        
+        // Если клавиша не найдена, вернуть 0
+        default: return 0x00;
+    }
+}
+
+static void update_keyboard_status(hid_keyboard_report_t const *report) {
+    uint8_t keyboard_status = 0;   // Статус клавиатуры
+    uint8_t extended_status = 0;   // Расширенный статус клавиатуры
+
+    // Обрабатываем модификаторы
+    if (report->modifier & 0x01) { // Left Control
+        keyboard_status |= 0x01;  // Устанавливаем первый бит для Left Ctrl
+    }
+    if (report->modifier & 0x02) { // Left Shift
+        keyboard_status |= 0x02;  // Устанавливаем второй бит для Left Shift
+    }
+    if (report->modifier & 0x04) { // Left Alt
+        keyboard_status |= 0x04;  // Устанавливаем третий бит для Left Alt
+    }
+    if (report->modifier & 0x08) { // Left GUI (Windows/Command)
+        keyboard_status |= 0x08;  // Устанавливаем четвёртый бит для Left GUI
+    }
+    if (report->modifier & 0x10) { // Right Control
+        keyboard_status |= 0x10;  // Устанавливаем пятый бит для Right Ctrl
+    }
+    if (report->modifier & 0x20) { // Right Shift
+        keyboard_status |= 0x20;  // Устанавливаем шестой бит для Right Shift
+    }
+    if (report->modifier & 0x40) { // Right Alt
+        keyboard_status |= 0x40;  // Устанавливаем седьмой бит для Right Alt
+    }
+    if (report->modifier & 0x80) { // Right GUI
+        keyboard_status |= 0x80;  // Устанавливаем восьмой бит для Right GUI
+    }
+
+    // Обработка Caps Lock
+    if (report->modifier & 0x01) {
+        // Проверяем состояние Caps Lock, например, можно использовать определённый бит
+        extended_status |= 0x01;  // Устанавливаем Caps Lock активен
+    }
+
+    // Обработка Num Lock
+    if (report->modifier & 0x02) {
+        extended_status |= 0x02;  // Устанавливаем Num Lock активен
+    }
+
+    // Обработка Scroll Lock
+    if (report->modifier & 0x04) {
+        extended_status |= 0x04;  // Устанавливаем Scroll Lock активен
+    }
+    x86_update_kbd_BDA(keyboard_status, extended_status);
+}
+
 inline static bool isInReport(hid_keyboard_report_t const *report, const unsigned char keycode) {
     for (unsigned char i: report->keycode) {
         if (i == keycode) {
@@ -273,8 +457,215 @@ inline static bool isInReport(hid_keyboard_report_t const *report, const unsigne
     return false;
 }
 
-extern Ps2Kbd_Mrmltr ps2kbd;
+void __not_in_flash_func(process_kbd_report)(
+    hid_keyboard_report_t const *report,
+    hid_keyboard_report_t const *prev_report
+) {
+    // Модификаторы
+    uint8_t modifier = report->modifier;  // Сохраняем текущие модификаторы (например, SHIFT, CTRL)
+    bool numLock = modifier & 0x10;  // Чтение состояния NumLock, предполагается, что это 0x10
+    update_keyboard_status(report);
 
+    // Обрабатываем каждый ключ в массиве keycode
+    for (int i = 0; i < 6; i++) {
+        uint8_t keycode = report->keycode[i];
+        if (keycode == HID_KEY_NONE) {
+            continue;  // Если код клавиши отсутствует (HID_KEY_NONE), пропускаем
+        }
+        if (isInReport(prev_report, keycode)) {
+            continue;  // Уже добавляли в прошлое нажатие
+        }
+
+        // Преобразуем нажатую клавишу в соответствующие значения scan и ascii
+        uint8_t scan = convert_keycode_to_scan(keycode);
+        uint8_t ascii = 0;  // Будем вычислять ASCII значение в зависимости от модификаторов
+
+        // Для примера простая обработка с добавлением SHIFT для букв
+        if (modifier & 0x02) {  // Проверка, нажат ли SHIFT
+            if (keycode >= HID_KEY_A && keycode <= HID_KEY_Z) {
+                // Преобразуем в заглавную букву
+                ascii = 'A' + (keycode - HID_KEY_A);
+            }
+        } else {
+            if (keycode >= HID_KEY_A && keycode <= HID_KEY_Z) {
+                // Преобразуем в строчную букву
+                ascii = 'a' + (keycode - HID_KEY_A);
+            } else if (keycode >= HID_KEY_1 && keycode <= HID_KEY_0) {
+                // Преобразуем числа
+                ascii = '1' + (keycode - HID_KEY_1);
+            } else { // Можно добавить другие клавиши
+                    switch (keycode) {
+                        case HID_KEY_TAB:
+                            ascii = '\t';  // Обрабатываем TAB
+                            break;
+                        case HID_KEY_MINUS:
+                            ascii = '-';  // Обрабатываем минус
+                            break;
+                        case HID_KEY_EQUAL:
+                            ascii = '=';  // Обрабатываем знак равно
+                            break;
+                        case HID_KEY_BRACKET_LEFT:
+                            ascii = '[';  // Обрабатываем открывающую квадратную скобку
+                            break;
+                        case HID_KEY_BRACKET_RIGHT:
+                            ascii = ']';  // Обрабатываем закрывающую квадратную скобку
+                            break;
+                        case HID_KEY_BACKSLASH:
+                            ascii = '\\';  // Обрабатываем обратный слэш
+                            break;
+                        case HID_KEY_SEMICOLON:
+                            ascii = ';';  // Обрабатываем точку с запятой
+                            break;
+                        case HID_KEY_APOSTROPHE:
+                            ascii = '\'';  // Обрабатываем апостроф
+                            break;
+                        case HID_KEY_GRAVE:
+                            ascii = '`';  // Обрабатываем обратную кавычку
+                            break;
+                        case HID_KEY_COMMA:
+                            ascii = ',';  // Обрабатываем запятую
+                            break;
+                        case HID_KEY_PERIOD:
+                            ascii = '.';  // Обрабатываем точку
+                            break;
+                        case HID_KEY_SLASH:
+                            ascii = '/';  // Обрабатываем косую черту
+                            break;
+                        case HID_KEY_CAPS_LOCK:
+                            // Модификатор Caps Lock может быть обработан отдельно (если нужно)
+                            break;
+                        case HID_KEY_F1:
+                        case HID_KEY_F2:
+                        case HID_KEY_F3:
+                        case HID_KEY_F4:
+                        case HID_KEY_F5:
+                        case HID_KEY_F6:
+                        case HID_KEY_F7:
+                        case HID_KEY_F8:
+                        case HID_KEY_F9:
+                        case HID_KEY_F10:
+                        case HID_KEY_F11:
+                        case HID_KEY_F12:
+                            // Эти клавиши не имеют ASCII кодов, так как они предназначены для функциональных действий
+                            // Пример: можно обработать их как специальные команды
+                            // Например, просто использовать специальные флаги, либо отправить в буфер что-то вроде "F1", "F2"
+                            // В вашем случае их можно игнорировать в контексте ASCII, или установить какие-то флаги
+                            ascii = 0;  // Не будем использовать их как ASCII символы, так как это не применимо.
+                            break;
+                        case HID_KEY_PRINT_SCREEN:
+                            // Пример: Print Screen клавиша
+                            ascii = 0;
+                            break;
+                        case HID_KEY_SCROLL_LOCK:
+                            // Пример: Scroll Lock клавиша
+                            ascii = 0;
+                            break;
+                        case HID_KEY_PAUSE:
+                            // Пример: Pause клавиша
+                            ascii = 0;
+                            break;
+                        case HID_KEY_INSERT:
+                            // Пример: Insert клавиша
+                            ascii = 0;
+                            break;
+                        case HID_KEY_HOME:
+                            // Пример: Home клавиша
+                            ascii = 0;
+                            break;
+                        case HID_KEY_PAGE_UP:
+                            // Пример: Page Up клавиша
+                            ascii = 0;
+                            break;
+                        case HID_KEY_DELETE:
+                            // Пример: Delete клавиша
+                            ascii = 0;
+                            break;
+                        case HID_KEY_END:
+                            // Пример: End клавиша
+                            ascii = 0;
+                            break;
+                        case HID_KEY_PAGE_DOWN:
+                            // Пример: Page Down клавиша
+                            ascii = 0;
+                            break;
+                        case HID_KEY_ARROW_RIGHT:
+                            // Пример: Right Arrow клавиша
+                            ascii = 0;
+                            break;
+                        case HID_KEY_ARROW_LEFT:
+                            // Пример: Left Arrow клавиша
+                            ascii = 0;
+                            break;
+                        case HID_KEY_ARROW_DOWN:
+                            // Пример: Down Arrow клавиша
+                            ascii = 0;
+                            break;
+                        case HID_KEY_ARROW_UP:
+                            // Пример: Up Arrow клавиша
+                            ascii = 0;
+                            break;
+                        case HID_KEY_NUM_LOCK:
+                            // Пример: Num Lock клавиша
+                            ascii = 0;
+                            break;
+                        case HID_KEY_KEYPAD_DIVIDE:
+                            if (numLock) {
+                                ascii = '/';  // Обрабатываем клавишу деления
+                            } else {
+                                ascii = 0;
+                            }
+                            break;
+                        case HID_KEY_KEYPAD_MULTIPLY:
+                            ascii = numLock ? '*' : 0;
+                            break;
+                        case HID_KEY_KEYPAD_SUBTRACT:
+                            ascii = numLock ? '-' : 0;
+                            break;
+                        case HID_KEY_KEYPAD_ADD:
+                            ascii = numLock ? '+' : 0;
+                            break;
+                        case HID_KEY_KEYPAD_ENTER:
+                            // Пример: Keypad Enter клавиша
+                            ascii = 0;
+                            break;
+                        case HID_KEY_KEYPAD_1:
+                        case HID_KEY_KEYPAD_2:
+                        case HID_KEY_KEYPAD_3:
+                        case HID_KEY_KEYPAD_4:
+                        case HID_KEY_KEYPAD_5:
+                        case HID_KEY_KEYPAD_6:
+                        case HID_KEY_KEYPAD_7:
+                        case HID_KEY_KEYPAD_8:
+                        case HID_KEY_KEYPAD_9:
+                        case HID_KEY_KEYPAD_0:
+                            if (numLock) {
+                                ascii = '0' + (keycode - HID_KEY_KEYPAD_0);  // Обрабатываем цифры на цифровой клавиатуре
+                            } else {
+                                ascii = 0;
+                            }
+                            break;
+                        case HID_KEY_KEYPAD_DECIMAL:
+                            ascii = numLock ? '.' : 0;
+                            break;
+                        case HID_KEY_KEYPAD_EQUAL:
+                            ascii = numLock ? '=' : 0;
+                            break;
+                        default:
+                            ascii = 0;  // Для всех остальных клавиш
+                            break;
+                    }
+            }
+        }
+
+        // Добавляем символ в буфер, если ASCII код корректен
+        if (ascii != 0) {
+            // Добавляем в буфер
+            x86_add_char_to_BDA(scan, ascii);  // Функция для добавления в буфер
+        }
+    }
+}
+
+#if 0
 void __not_in_flash_func(process_kbd_report)(
     hid_keyboard_report_t const *report,
     hid_keyboard_report_t const *prev_report
@@ -329,6 +720,7 @@ void __not_in_flash_func(process_kbd_report)(
     }
 
 }
+#endif
 
 Ps2Kbd_Mrmltr ps2kbd(
     pio1,
@@ -352,20 +744,6 @@ static i2s_config_t i2s_config = {
     
 static semaphore vga_start_semaphore;
 
-#ifdef HDMIA
-#define __dvi_func_x(f) __scratch_x(__STRING(f)) f
-static inline void __dvi_func_x(_dvi_prepare_scanline_16bpp)(struct dvi_inst *inst, uint32_t *scanbuf) {
-    uint32_t *tmdsbuf = NULL;
-    queue_remove_blocking_u32(&inst->q_tmds_free, &tmdsbuf);
-    uint pixwidth = inst->timing->h_active_pixels;
-    uint words_per_channel = pixwidth / DVI_SYMBOLS_PER_WORD;
-    tmds_encode_data_channel_16bpp(scanbuf, tmdsbuf + 0 * words_per_channel, pixwidth / 2, DVI_16BPP_BLUE_MSB,  DVI_16BPP_BLUE_LSB );
-    tmds_encode_data_channel_16bpp(scanbuf, tmdsbuf + 1 * words_per_channel, pixwidth / 2, DVI_16BPP_GREEN_MSB, DVI_16BPP_GREEN_LSB);
-    tmds_encode_data_channel_16bpp(scanbuf, tmdsbuf + 2 * words_per_channel, pixwidth / 2, DVI_16BPP_RED_MSB,   DVI_16BPP_RED_LSB  );
-    queue_add_blocking_u32(&inst->q_tmds_valid, &tmdsbuf);
-}
-#endif
-
 void __time_critical_func(render_core)() {
     multicore_lockout_victim_init();
     clrBuf();
@@ -379,14 +757,6 @@ void __time_critical_func(render_core)() {
 //    graphics_set_textbuffer(buffer);
     clrScr(0);
     sem_acquire_blocking(&vga_start_semaphore);
-#ifdef HDMIA
-while (1) {
-    uint32_t *scanbuf = NULL;
-    queue_remove_blocking_u32(&dvi0.q_colour_valid, &scanbuf);
-    _dvi_prepare_scanline_16bpp(&dvi0, scanbuf);
-    queue_add_blocking_u32(&dvi0.q_colour_free, &scanbuf);
-}
-#endif
     // 60 FPS loop
 #define frame_tick (16666)
     uint64_t tick = time_us_64();
@@ -443,13 +813,11 @@ static void PWM_init_pin(uint8_t pinN, uint16_t max_lvl) {
 static const char* get_volt() {
     const char* volt = (const char*)"1.3 V";
     switch(vol) {
-#if !PICO_RP2040
         case VREG_VOLTAGE_0_60: volt = "0.6 V"; break;
         case VREG_VOLTAGE_0_65: volt = "0.65V"; break;
         case VREG_VOLTAGE_0_70: volt = "0.7 V"; break;
         case VREG_VOLTAGE_0_75: volt = "0.75V"; break;
         case VREG_VOLTAGE_0_80: volt = "0.8 V"; break;
-#endif
         case VREG_VOLTAGE_0_85: volt = "0.85V"; break;
         case VREG_VOLTAGE_0_90: volt = "0.9 V"; break;
         case VREG_VOLTAGE_0_95: volt = "0.95V"; break;
@@ -460,7 +828,6 @@ static const char* get_volt() {
         case VREG_VOLTAGE_1_20: volt = "1.2 V"; break;
         case VREG_VOLTAGE_1_25: volt = "1.25V"; break;
         case VREG_VOLTAGE_1_30: volt = "1.3 V"; break;
-#if !PICO_RP2040
         // Above this point you will need to set POWMAN_VREG_CTRL_DISABLE_VOLTAGE_LIMIT
         case VREG_VOLTAGE_1_35: volt = "1.35V"; break;
         case VREG_VOLTAGE_1_40: volt = "1.4 V"; break;
@@ -478,7 +845,6 @@ static const char* get_volt() {
         case VREG_VOLTAGE_3_00: volt = "3.0 V"; break;
         case VREG_VOLTAGE_3_15: volt = "3.15V"; break;
         case VREG_VOLTAGE_3_30: volt = "3.3 V"; break;
-#endif
     }
     return volt;
 }
@@ -495,38 +861,11 @@ void __attribute__((naked, noreturn)) __printflike(1, 0) dummy_panic(__unused co
         goutf(30-1, true, fmt);
 }
 
-#ifdef HDMIA
-#include "wikimedia_christmas_tree_in_field_320x240_rgb565.h"
-void __scratch_x("render") render_scanline(uint16_t *scanbuf, uint raster_y) {
-	// Use DMA to copy in background line (for speed)
-	uint dma_chan = dma_claim_unused_channel(true);
-    dma_channel_config cfg = dma_channel_get_default_config(dma_chan);
-    channel_config_set_write_increment(&cfg, true);
-    dma_channel_configure(
-    	dma_chan,
-    	&cfg,
-    	scanbuf,
-    	&((const uint16_t*)wikimedia_christmas_tree_in_field_320x240)[raster_y * FRAME_WIDTH],
-    	FRAME_WIDTH / 2,
-    	true
-    );
-    dma_channel_wait_for_finish_blocking(dma_chan);
-    dma_channel_unclaim(dma_chan);
-}
-#endif
-
-#if !PICO_RP2040
-#ifdef BUTTER_PSRAM_GPIO
-
-#include <hardware/exception.h>
-#include <hardware/structs/qmi.h>
-#include <hardware/structs/xip.h>
-#ifdef BUTTER_PSRAM_GPIO
 #define MB16 (16ul << 20)
 #define MB8 (8ul << 20)
 #define MB4 (4ul << 20)
 #define MB1 (1ul << 20)
-uint32_t __not_in_flash_func(butter_psram_size)() {
+extern "C" uint32_t __not_in_flash_func(butter_psram_size)() {
     static int BUTTER_PSRAM_SIZE = -1;
     if (BUTTER_PSRAM_SIZE != -1) return BUTTER_PSRAM_SIZE;
 
@@ -555,13 +894,7 @@ e0:
     BUTTER_PSRAM_SIZE = res;
     return res;
 }
-#else
-static uint8_t* PSRAM_DATA = (uint8_t*)0;
-#endif
-#else
-static uint8_t* PSRAM_DATA = (uint8_t*)0;
-#endif
-#endif
+
 
 inline static u32 x86_int10(u32 eax, u32 ebx, u32 ecx, u32 edx) {
     register u32 in_eax __asm__("r0") = eax;
@@ -621,6 +954,34 @@ inline static u32 x86_int13(u32 eax, u32 ebx, u32 ecx, u32 edx) {
     return result;
 }
 
+inline static u32 x86_int16(u32 eax, u32 ebx, u32 ecx, u32 edx) {
+    register u32 in_eax __asm__("r0") = eax; // результат тоже будет в r0
+    register u32 in_ebx __asm__("r1") = ebx;
+    register u32 in_ecx __asm__("r2") = ecx;
+    register u32 in_edx __asm__("r3") = edx;
+    __asm__ volatile (
+        "  push {r1-r12, lr}\n"         // Сохраняем рабочие регистры (r1-r12, lr)
+        "  mov  r4, r0\n"               // r4 = EAX
+        "  mov  r5, r1\n"               // r5 = EBX
+        "  mov  r6, r2\n"               // r6 = ECX
+        "  mov  r7, r3\n"               // r7 = EDX
+        "  CPSID i\n"                   // Запрет прерываний
+        "  adr  r11, 1f\n"              // Адрес возврата (метка 1)
+        "  mrs  r12, apsr\n"            // Сохраняем флаги
+        "  push {r11, r12}\n"           // Эмулируем PUSH IP, PUSH FLAGS
+        "  ldr  r11, =0x11000058\n"     // Адрес обработчика INT 16h
+        "  ldr  r11, [r11]\n"
+        "  mov  pc, r11\n"              // Переход к обработчику
+        "1:\n"                          // Метка возврата
+        "  mov  r0, r4\n"               // В r0 результат (из r4)
+        "  pop  {r1-r12, lr}\n"          // Восстанавливаем сохранённые регистры
+        :
+        : "r"(in_eax), "r"(in_ebx), "r"(in_ecx), "r"(in_edx)
+        : "r4", "r5", "r6", "r7", "r11", "r12", "memory"
+    );
+    return in_eax;
+}
+
 static void format_hdd_test(int y) {
     u32 total_tracks = 512;          // Максимальное количество дорожек
     u32 heads = 256;                 // Максимальное количество головок
@@ -648,7 +1009,7 @@ static void format_hdd_test(int y) {
 
             u32 status = x86_int13(eax, ebx, ecx, edx);
 
-            goutf(y, false, "INT 13 AH=5 format [%d:%d:1-63] rc: %08X", track, head, status);
+            goutf(0, false, "INT 13 AH=5 format [%d:%d:1-63] rc: %08X", track, head, status);
             if (status) return;
         }
     }
@@ -828,7 +1189,6 @@ static int testPins(uint32_t pin0, uint32_t pin1) {
 }
 
 int main() {
-#if !PICO_RP2040
     volatile uint32_t *qmi_m0_timing=(uint32_t *)0x400d000c;
     vreg_disable_voltage_limit();
     vreg_set_voltage(VREG_VOLTAGE_1_60);
@@ -836,18 +1196,9 @@ int main() {
     *qmi_m0_timing = 0x60007204;
     set_sys_clock_khz(378 * KHZ, 0);
     *qmi_m0_timing = 0x60007303;
-#else
-    hw_set_bits(&vreg_and_chip_reset_hw->vreg, VREG_AND_CHIP_RESET_VREG_VSEL_BITS);
-    sleep_ms(10);
-    set_sys_clock_khz(CPU_MHZ * KHZ, true);
-#endif
 
-#if PICO_RP2350
-#ifdef BUTTER_PSRAM_GPIO
     psram_init(BUTTER_PSRAM_GPIO);
     exception_set_exclusive_handler(HARDFAULT_EXCEPTION, sigbus);
-#endif
-#endif
 
     int links = testPins(VGA_BASE_PIN, VGA_BASE_PIN + 1);
     SELECT_VGA = (links == 0) || (links == 0x1F);
@@ -866,47 +1217,20 @@ int main() {
     multicore_launch_core1(render_core);
     sem_release(&vga_start_semaphore);
 
-#ifdef HDMIA
-    set_sys_clock_khz(DVI_TIMING.bit_clk_khz, true);
-	dvi0.timing = &DVI_TIMING;
-	dvi0.ser_cfg = DVI_DEFAULT_SERIAL_CONFIG;
-	dvi_init(&dvi0, next_striped_spin_lock_num(), next_striped_spin_lock_num());
-
-	for (int i = 0; i < N_SCANLINE_BUFFERS; ++i) {
-		void *bufptr = &static_scanbuf[i];
-		queue_add_blocking(&dvi0.q_colour_free, &bufptr);
-	}
-
-    uint frame_ctr = 0;
-	uint16_t *scanbuf = 0;
-	while (true) {
-		for (uint y = 0; y < FRAME_HEIGHT; ++y) {
-			queue_remove_blocking_u32(&dvi0.q_colour_free, &scanbuf);
-			render_scanline(scanbuf, y);
-			queue_add_blocking_u32(&dvi0.q_colour_valid, &scanbuf);
-		}
-		++frame_ctr;
-	}
-#endif
-
     FATFS fs;
-///    draw_text("Init SDCARD", 0, TEXTMODE_ROWS - 1, 7, 0);
     if (f_mount(&fs, "SD", 1) == FR_OK) {
-//        goutf(y++, false, "SDCARD %d FATs; %d free clusters (%d KB each)", fs.n_fats, f_getfree32(&fs), fs.csize >> 1);
         cd_card_mount = true;
         f_mkdir(HOME_DIR);
     } else {
         draw_text("SDCARD not connected", 0, 0, 12, 0);
     }
 
-///    draw_text("Init keyboard", 0, TEXTMODE_ROWS - 1, 7, 0);
     tuh_init(BOARD_TUH_RHPORT);
     ps2kbd.init_gpio();
 //    keyboard_init();
     sleep_ms(50);
 
     uint32_t psram32 = butter_psram_size();
-    no_butterbod = psram32 == 0;
     goutf(0, true, "Murmulator VGA/HDMI BIOS for RP2350 378 MHz 1.6V");
     {
         uint32_t a = 0;
@@ -967,11 +1291,22 @@ skip_it:
 
     x86_init();
 
+    u32 eax = x86_int10(0x0003, 0, 0, 0); // try mode 3
+    u32 i = 0;
+    while(1) {
+        eax = x86_int16(0, 0, 0, 0);
+     //   goutf(30-3, false, "INT 16 AH=00 rc: %08X (%d)", eax, i++);
+      //  if (eax)
+        //    sleep_ms(1000);
+      //  else
+            sleep_ms(20);
+    }
+#if 0
     u32 eax = x86_int10(0x0000, 0, 0, 0); // try mode 0
     eax = x86_int10(0x0003, 0, 0, 0); // try mode 3
     eax = x86_int10(0x0F00, 0, 0, 0); // show mode in result
     goutf(30-3, false, "INT 10 AH=0F rc: %08X", eax);
-#if 0
+
     u32 eax = x86_int13(0, 0, 0, 0);
     goutf(y++, false, "INT 13 AH=0 rc: %08X", eax);
     eax = x86_int13(1 << 8, 0, 0, 0);

@@ -447,6 +447,23 @@ inline static u32 x86_int10_hanler_0A(u32 eax, u32 ebx, u32 ecx) {
     return 0;
 }
 
+inline static u32 x86_int10_hanler_0B(u32 ebx) {
+    switch(BH) {
+        case 0: // SET BACKGROUND/BORDER COLOR
+            border_color = BL;
+            return 0;
+        case 1: // This call was only valid in 320x200 graphics on the CGA, but newer cards support it in many or all graphics modes
+            /**
+             * BL = palette ID
+             * 00h background, green, red, and brown/yellow
+             * 01h background, cyan, magenta, and white
+             */
+            paletteID = BL;
+            return 0;
+    }
+    return 0xFF00 | CF_ON;
+}
+
 /**
  * VIDEO - TELETYPE OUTPUT
  * AH = 0Eh
@@ -557,6 +574,8 @@ u32 x86_int10_hanler_C(u32 eax, u32 ebx, u32 ecx, u32 edx) {
             return x86_int10_hanler_09(eax, ebx, ecx);
         case 0x0A:
             return x86_int10_hanler_0A(eax, ebx, ecx);
+        case 0x0B:
+            return x86_int10_hanler_0B(ebx);
         case 0x0E:
             return x86_int10_hanler_0E(eax, ebx);
         case 0x0F:

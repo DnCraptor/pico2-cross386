@@ -18,21 +18,20 @@ static void ints(void) {
     }
     // TODO:
     X86_BASE_RAM[0x10] = (uint32_t)&x86_int10_hanler;
+    X86_BASE_RAM[0x11] = (uint32_t)&x86_int11_hanler;
+    X86_BASE_RAM[0x12] = (uint32_t)&x86_int12_hanler;
     X86_BASE_RAM[0x13] = (uint32_t)&x86_int13_hanler;
+    X86_BASE_RAM[0x15] = (uint32_t)&x86_int15_hanler;
+    X86_BASE_RAM[0x16] = (uint32_t)&x86_int16_hanler;
 }
 
 static void post(void) {
     // POST test results:
     u8* BDA = X86_FAR_PTR(0x0040, 0x0000);
     u16* BDA16 = (u16*)BDA;
-    BDA16[0] = 0; // COM1 base address [0x0402]=0 (todo: 0x03F8)
-    BDA16[1] = 0; // COM2 0x0404
-    BDA16[2] = 0; // COM3
-    BDA16[3] = 0; // COM4
-    BDA16[4] = 0; // LPT1
-    BDA16[5] = 0; // LPT2
-    BDA16[6] = 0; // LPT3
-    BDA16[7] = 0; // LPT4
+    for (int i = 0; i < 128; ++i) {
+        BDA16[i] = 0;
+    }
     /*  Расшифровка Equipment List (0x0410):
     Бит	Описание
     0-1	Количество дискетных приводов - 1 меньше реального количества:
@@ -50,32 +49,23 @@ static void post(void) {
     */
     BDA16[8] = SELECT_VGA ? 0b001001 : 0b011001;
     BDA16[8] = 0; /// TODO: 0x1234 = перезапуск, 0x0000 = холодный старт
-    BDA += 0x13; // перекрытие области BDA
-    BDA16 = (u16*)BDA; // 413h
-    BDA16[0] = 640; // 0x0413	Размер конвенциональной памяти (в килобайтах)
-    BDA16[1] = 0x0400; // 0x0415	2 байта	Адрес сегмента клавиатурного буфера (начало)
-    BDA16[2] = 0x0400 + 0x0010; // 0x0417	2 байта	Адрес сегмента клавиатурного буфера (конец)
-    BDA16[3] = 0; // 0x0419	1 байт	Заголовок состояния клавиатуры + 0x041A	1 байт	Расширенный статус клавиатуры
-    BDA16[4] = 0; // Голова указателя чтения клавиатурного буфера (0x041B)
-    BDA16[5] = 0; // Хвост указателя записи клавиатурного буфера (0x041D)
-    BDA16 += 6;
-     // 0x041F	32 байта	Сам клавиатурный буфер (содержит коды нажатых клавиш)
-    memset(BDA16, 0, 32);
-    BDA16 += 16;
-    BDA16[0] = 0; // 0x043F	1 байт	Индикаторы состояния клавиатуры (CapsLock, NumLock и т.п.); +  0x0440	1 байт	BIOS timer overflow counter (переполнение таймера)
-    BDA16[1] = 0; // 0x0441	4 байта	Системный таймер (тикер) (счётчик 18.2 раз в секунду)
-    BDA16[2] = 0; // ^
-    BDA16[3] = 0; // 0x0445	2 байта	Таймаут для автоповтора клавиатуры
-    BDA16[4] = 0; // 0x0447	2 байта	Таймаут клавиатуры после последней активности
-    BDA16[5] = 0; // 0x0449	2 байта	Количество нажатий клавиши Ctrl+Alt+Del
-    BDA16[6] = 0; // 0x044B	2 байта	Длина текущего таймаута POST'а
-    BDA16[7] = 0; // 0x044D	1 байт	Номер последней активной дискеты + 0x044E	1 байт	Статус дискеты (флаги, ошибок и пр.)
-    BDA = X86_FAR_PTR(0x0040, 0x004F);
-    *BDA = 0; // 0x044F	1 байт	Таймер моторчика дискеты
-    BDA16 = (u16*)(BDA+1); /// 0x0450
-    memset(BDA16, 0, 16); /// 0x0450	16 байт	Позиции курсора для всех видео страниц
-    BDA16 += 8; // 0x0460
-    BDA16[0] = 0; // 0x0460	2 байта	Активная страница дисплея
+
+    u16* bda16 = (u16*)(BDA + 0x13);
+    *bda16 = 640; // 0x0413	Размер конвенциональной памяти (в килобайтах)
+    
+    //1Ah	WORD	Keyboard: ptr to next character in keyboard buffer
+    //1Ch	WORD	Keyboard: ptr to first free slot in keyboard buffer
+    //1Eh 16 WORDs	Keyboard circular buffer (but see 80h, 82h for override)
+
+    // 0x0445	2 байта	Таймаут для автоповтора клавиатуры
+    // 0x0447	2 байта	Таймаут клавиатуры после последней активности
+    // 0x0449	2 байта	Количество нажатий клавиши Ctrl+Alt+Del
+    // 0x044B	2 байта	Длина текущего таймаута POST'а
+    // 0x044D	1 байт	Номер последней активной дискеты + 0x044E	1 байт	Статус дискеты (флаги, ошибок и пр.)
+    // 0x044F	1 байт	Таймер моторчика дискеты
+    // 0x0450	16 байт	Позиции курсора для всех видео страниц
+    BDA16 = (u16*)(BDA + 0x60);
+    // 0x0460	2 байта	Активная страница дисплея
     BDA16[1] = 0xB800; // 0x0462	2 байта	Базовый адрес видеобуфера (0xB800, 0xB000)
     BDA = X86_FAR_PTR(0x0040, 0x0064);
     *BDA = current_video_mode; // 0x0464	1 байт	Режим работы видеоадаптера (номер режима)
@@ -102,4 +92,44 @@ void x86_init(void) {
     X86_CR0 = 0x00000010; // PE=0, ET=1
     ints();
     post();
+}
+
+void x86_add_char_to_BDA(u8 scan, u8 ascii) {
+    // Получаем указатель на BDA (Base Data Area) для чтения данных клавиатуры
+    const u8* BDA = X86_FAR_PTR(0x0040, 0x0000);
+    u16* BDA16 = (u16*)(BDA + 0x1A);
+    const u16 tail = BDA16[1] % 16; // Хвост указателя записи клавиатурного буфера (0x041C)
+    // Буфер клавиш начинается с 0x041E, он имеет 16 слов (32 байта)
+    u16* buffer = (u16*)(BDA + 0x1E);
+    buffer[tail] = ((u16)scan << 8) | ascii;
+    static int i = 0;
+    goutf(30-1, false, "W %02X[%c]/%02X (%d)", ascii, ascii, scan, i++);
+    BDA16[1] = tail + 1;
+}
+
+/**
+ *  17h	BYTE	Keyboard status flags 1:
+		    bit 7 =1 INSert active
+		    bit 6 =1 Caps Lock active
+		    bit 5 =1 Num Lock active
+		    bit 4 =1 Scroll Lock active
+		    bit 3 =1 either Alt pressed
+		    bit 2 =1 either Ctrl pressed
+		    bit 1 =1 Left Shift pressed
+		    bit 0 =1 Right Shift pressed
+ 18h	BYTE	Keyboard status flags 2:
+		    bit 7 =1 INSert pressed
+		    bit 6 =1 Caps Lock pressed
+		    bit 5 =1 Num Lock pressed
+		    bit 4 =1 Scroll Lock pressed
+		    bit 3 =1 Pause state active
+		    bit 2 =1 Sys Req pressed
+		    bit 1 =1 Left Alt pressed
+		    bit 0 =1 Left Ctrl pressed
+ */
+void x86_update_kbd_BDA(u8 keyboard_status, u8 extended_status) {
+    u8* BDA = X86_FAR_PTR(0x0040, 0x0000);
+    // Сохранение статуса в BDA
+    BDA[0x17] = keyboard_status;  // Сохраняем статус клавиатуры в BDA
+    BDA[0x18] = extended_status;  // Сохраняем расширенный статус в BDA
 }

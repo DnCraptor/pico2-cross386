@@ -25,7 +25,8 @@ typedef uint64_t u64;
 #define DX ((u16)(edx))
 #define DI ((u16)(edi))
 
-#define CF_ON (1 << 29)
+#define CF_ON (1l << 29)
+#define ZF_ON (1l << 30)
 
 extern u16 X86_CS;
 extern u16 X86_DS;
@@ -100,11 +101,18 @@ __attribute__((naked)) void x86_iret(void);
 
 // x86 BIOS asm wrappers
 __attribute__((naked)) void x86_int10_hanler();
+__attribute__((naked)) void x86_int11_hanler();
+__attribute__((naked)) void x86_int12_hanler();
 __attribute__((naked)) void x86_int13_hanler();
+__attribute__((naked)) void x86_int15_hanler();
+__attribute__((naked)) void x86_int16_hanler();
 
 // x86 BIOS implementation
 u32 x86_int10_hanler_C(u32 eax, u32 ebx, u32 ecx, u32 edx) __attribute__((pcs("aapcs")));
 u32 x86_int13_hanler_C(u32 eax, u32 ebx, u32 ecx, u32 edx) __attribute__((pcs("aapcs")));
+
+void x86_add_char_to_BDA(u8 scan, u8 ascii);
+void x86_update_kbd_BDA(u8 keyboard_status, u8 extended_status);
 
 #ifdef __cplusplus
 }

@@ -35,6 +35,8 @@ uint32_t text_cursor_type = 0x1018; // мигающий курсор внизу 
 uint8_t text_cursor_row = 0;
 uint8_t text_cursor_column = 0;
 uint8_t text_page = 0;
+uint8_t border_color = 0; // background/border color (border only in text modes)
+uint8_t paletteID = 0; // valid in 320x200 graphics on the CGA, but newer cards support it in many or all graphics modes
 
 void __time_critical_func() handle_frame_changed() {
     uint8_t* b1 = (uint8_t*)VGA_FRAMBUFFER_WINDOW_START;
@@ -88,9 +90,8 @@ void draw_text(const char* string, uint32_t x, uint32_t y, uint8_t color, uint8_
 void draw_debug_text(const char* string, uint32_t x, uint32_t y, uint8_t color, uint8_t bgcolor) {
     uint32_t w = SELECT_VGA ? (current_video_mode == 3 ? 80 : 40) : 53;
     uint8_t* t_buf = (uint8_t*)SCREEN + w * 2 * y + 2 * x;
-    for (int xi = w * 2; xi--;) {
-        if (!*string) break;
-        *t_buf++ = *string++;
+    for (int xi = w * 2; xi--; ) {
+        *t_buf++ = *string ? *string++ : ' ';
         *t_buf++ = bgcolor << 4 | color & 0xF;
     }
 }
