@@ -40,32 +40,38 @@ void __time_critical_func() handle_frame_changed() {
     uint8_t* b1 = (uint8_t*)VGA_FRAMBUFFER_WINDOW_START;
     b1 += text_page * VGA_FRAMBUFFER_WINDOW_SIZE;
     uint8_t* b2 = SCREEN;
+    uint32_t w = SELECT_VGA ? (current_video_mode == 3 ? 80 : 40) : 53;
     if (current_video_mode == 0) { // HDMI 53*30 -> 40*25
         #ifdef CLEANUP_VGA_TOP_DEBUG_SPACE
-        memset(b2, 0, 53 * 2 * 2); // first 2 lines
+        memset(b2, 0, w * 2 * 2); // first 2 lines
         #endif
-        b2 += 53 * 2 * 2;
-        for (int line = 0; line < 25; ++line) {
-            memset(b2, 0, 6 * 2); // first 6 chars in line
-            b2 += 6 * 2;
-            memcpy(b2, b1, 40 * 2);
-            b1 += 40 * 2;
-            b2 += 40 * 2;
-            memset(b2, 0, 7 * 2); // last 7 chars in line
-            b2 += 7 * 2;
+        b2 += w * 2 * 2;
+        if (w == 53) {
+            for (int line = 0; line < 25; ++line) {
+                memset(b2, 0, 6 * 2); // first 6 chars in line
+                b2 += 6 * 2;
+                memcpy(b2, b1, 40 * 2);
+                b1 += 40 * 2;
+                b2 += 40 * 2;
+                memset(b2, 0, 7 * 2); // last 7 chars in line
+                b2 += 7 * 2;
+            }
+        } else {
+            memcpy(b2, b1, VGA_FRAMBUFFER_WINDOW_SIZE);
+            b2 += VGA_FRAMBUFFER_WINDOW_SIZE;
         }
         #ifdef CLEANUP_VGA_BOTTOM_DEBUG_SPACE
-        memset(b2, 0, 53 * 3 * 2); // last 3 lines
+        memset(b2, 0, w * 3 * 2); // last 3 lines
         #endif
     } else {
         #ifdef CLEANUP_VGA_TOP_DEBUG_SPACE
-        memset(b2, 0, 80 * 2 * 2); // first 2 lines
+        memset(b2, 0, w * 2 * 2); // first 2 lines
         #endif
-        b2 += 80 * 2 * 2;
+        b2 += w * 2 * 2;
         memcpy(b2, b1, VGA_FRAMBUFFER_WINDOW_SIZE);
-        b2 += VGA_FRAMBUFFER_WINDOW_SIZE;
         #ifdef CLEANUP_VGA_BOTTOM_DEBUG_SPACE
-        memset(b2, 0, 80 * 3 * 2); // last 3 lines
+        b2 += VGA_FRAMBUFFER_WINDOW_SIZE;
+        memset(b2, 0, w * 3 * 2); // last 3 lines
         #endif
     }
 }
@@ -80,7 +86,7 @@ void draw_text(const char* string, uint32_t x, uint32_t y, uint8_t color, uint8_
 }
 
 void draw_debug_text(const char* string, uint32_t x, uint32_t y, uint8_t color, uint8_t bgcolor) {
-    uint32_t w = SELECT_VGA ? 80 : 53;
+    uint32_t w = SELECT_VGA ? (current_video_mode == 3 ? 80 : 40) : 53;
     uint8_t* t_buf = (uint8_t*)SCREEN + w * 2 * y + 2 * x;
     for (int xi = w * 2; xi--;) {
         if (!*string) break;
@@ -118,11 +124,11 @@ void draw_window(const char* title, uint32_t x, uint32_t y, uint32_t width, uint
     draw_text(line, x + (width - strlen(line)) / 2, y, 14, 3);
 }
 
-void clrScr(const uint8_t color) {
+void clrScr(const uint8_t bgColor) {
     uint16_t* t_buf = (uint16_t*)VGA_FRAMBUFFER_WINDOW_START;
     t_buf += text_page * VGA_FRAMBUFFER_WINDOW_SIZE;
     int size = current_video_mode_width * current_video_mode_height;
-    while (size--) *t_buf++ = color << 4 | ' ';
+    while (size--) *t_buf++ = (bgColor << 4) | ' ';
 }
 
 void clrBuf(void) {

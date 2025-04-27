@@ -1,3 +1,4 @@
+#include <string.h>
 #include <pico/stdlib.h>
 #include "x86.h"
 #include "graphics.h"
@@ -76,6 +77,29 @@ if (mode <= 5 || mode == 7) {
     AL = 0x20;    // все остальные режимы >7
 }
     */
+    switch(AL) {
+        case 0:
+            current_video_mode = AL;
+            current_video_mode_width = 40;
+            current_video_mode_height = 25;
+            graphics_set_mode(TEXTMODE_53x30);
+            break;
+        case 3:
+            current_video_mode = AL;
+            current_video_mode_width = 80;
+            current_video_mode_height = 25;
+            graphics_set_mode(TEXTMODE_DEFAULT);
+            break;
+        default:
+    }
+    VGA_FRAMBUFFER_WINDOW_SIZE = current_video_mode_width * current_video_mode_height;
+    u8* BDA = X86_FAR_PTR(0x0040, 0x0064);
+    *BDA = current_video_mode; // 0x0464	1 байт	Режим работы видеоадаптера (номер режима)
+    u16* BDA16 = (u16*)(BDA + 1); // 465h
+    BDA16[0] = current_video_mode_width; // 0x0465	2 байта	Количество столбцов (ширина экрана в символах)
+    BDA16[1] = 0xB800; // 0x0467	2 байта	Начальный адрес видеобуфера для скроллинга
+    BDA16[2] = current_video_mode_height - 1; // 0x0469	2 байта	Количество строк на экране (минус 1)
+    BDA16[3] = current_video_mode_width * 2; // 0x046B	2 байта	Количество байт на строку
     clrScr(0);
     return 0x30; 
 }
@@ -153,8 +177,238 @@ inline static u32 x86_int10_hanler_03(u32 ebx) {
     return 0;
 }
 
+/**
+ * VIDEO - SELECT ACTIVE DISPLAY PAGE
+ * AH = 05h
+ * AL = new page number (00h to number of pages - 1) (see #00010)
+ * Returns: Nothing
+ */
+inline static u32 x86_int10_hanler_05(u32 eax) {
+    if (AL > 7) return 0;
+    // 0x0460 — 2 байта, активная страница дисплея (значение указывает на текущую страницу видео, например, для VGA/CGА).
+    u16* BDA = (u16*)X86_FAR_PTR(0x0040, 0x0060);
+    *BDA = AL;
+    text_page = AL;
+    return 0;
+}
+
+/*
+Вот список стандартных цветов, которые можно использовать в текстовом режиме на видеокартах типа CGA, EGA, VGA и других совместимых с 16-цветовой палитрой. Каждый цвет можно задать как значение от 0 до 15 (в 4-битном формате, где 4 старших бита — это цвет фона, а 4 младших — цвет текста).
+
+### Стандартные цвета:
+| Код | Цвет        | Описание                |
+|-----|-------------|-------------------------|
+| 0   | Черный      | Black                   |
+| 1   | Синий       | Blue                    |
+| 2   | Зеленый     | Green                   |
+| 3   | Голубой     | Cyan                    |
+| 4   | Красный     | Red                     |
+| 5   | Фиолетовый  | Magenta                 |
+| 6   | Желтый      | Yellow                  |
+| 7   | Светло-серый| Light Gray              |
+| 8   | Темно-серый | Dark Gray               |
+| 9   | Светло-синий| Light Blue              |
+| 10  | Светло-зеленый | Light Green          |
+| 11  | Светло-голубой | Light Cyan           |
+| 12  | Светло-красный | Light Red            |
+| 13  | Светло-фиолетовый | Light Magenta     |
+| 14  | Светло-желтый | Light Yellow          |
+| 15  | Белый       | White                   |
+
+### Пример использования в **BH**:
+- **BH = 0x1F**:
+  - Цвет текста: **0x1** (Белый)
+  - Цвет фона: **0xF** (Черный)
+
+### Формат записи:
+- **Текст**: указывается в старших 4 битах (0x0-0xF).
+- **Фон**: указывается в младших 4 битах (0x0-0xF). 
+
+Это значение будет использоваться для записи пустых строк внизу окна после прокрутки (при использовании прерывания **AH = 06h**).
+*/
+
+/**
+ * VIDEO - SCROLL UP WINDOW
+ * AH = 06h
+ * AL = number of lines by which to scroll up (00h = clear entire window)
+ * BH = attribute used to write blank lines at bottom of window
+ *      Низкие 4 бита (0-3): Атрибут фона (цвет фона). Высокие 4 бита (4-7): Атрибут текста (цвет текста).
+ * CH,CL = row,column of window's upper left corner
+ * DH,DL = row,column of window's lower right corner
+ * Returns: Nothing
+ */
+inline static u32 x86_int10_hanler_06(u32 eax, u32 ebx, u32 ecx, u32 edx) {
+    // Получение атрибутов фона и текста из BH
+    const uint16_t attr = ((BH & 0x0F) << 4) | (BH >> 4);  // swap colors
+
+    const uint16_t width = current_video_mode_width;
+    const uint16_t height = current_video_mode_height;
+
+    // Смещение в видеопамяти для текущей страницы
+    uint8_t* b1 = (uint8_t*)VGA_FRAMBUFFER_WINDOW_START;
+    b1 += text_page * VGA_FRAMBUFFER_WINDOW_SIZE;
+
+    const uint16_t blank_char = (attr << 8) | ' ';  // Пробел с атрибутами
+
+    if (!AL) {
+        u16* t_buf = (u16*)b1;
+        int size = width * height;
+        while (size--) *t_buf++ = blank_char;
+        return 0;
+    }
+
+    // Прокрутка содержимого окна
+    const uint8_t* window_start = b1 + (CH * width + CL) * 2;  // Начало окна (с учетом позиционирования)
+    const uint8_t* window_end = b1 + (DH * width + DL) * 2;    // Конец окна (с учетом позиционирования)
+
+    const uint16_t window_height = DH - CH + 1;  // Высота окна
+    const uint16_t scroll_lines = AL;  // Количество строк для прокрутки
+
+    // Прокручиваем строки в пределах окна
+    if (scroll_lines > 0) {
+        const uint8_t* src = window_start + (scroll_lines * width * 2); // Источник для копирования
+        const uint8_t* dest = window_start;  // Куда копировать
+        size_t sz = width * 2 * (window_height - scroll_lines);
+        memcpy(dest, src, sz);  // Копирование области
+        // Очистка нижней части окна
+        u16* clear_area = (u16*)dest + sz;
+        for (uint16_t row = 0; row < scroll_lines; ++row) {
+            for (uint16_t col = 0; col < width; ++col) {
+                *clear_area++ = blank_char;
+            }
+        }
+    }
+    return 0;
+}
+
+/**
+ * VIDEO - SCROLL DOWN WINDOW
+ * AH = 07h
+ * AL = number of lines by which to scroll down (00h = clear entire window)
+ * BH = attribute used to write blank lines at top of window
+ *      Низкие 4 бита (0-3): Атрибут фона (цвет фона). Высокие 4 бита (4-7): Атрибут текста (цвет текста).
+ * CH,CL = row,column of window's upper left corner
+ * DH,DL = row,column of window's lower right corner
+ * Returns: Nothing
+ */
+inline static u32 x86_int10_hanler_07(u32 eax, u32 ebx, u32 ecx, u32 edx) {
+    // Получение атрибутов фона и текста из BH
+    const uint16_t attr = ((BH & 0x0F) << 4) | (BH >> 4);  // swap colors
+
+    const uint16_t width = current_video_mode_width;
+    const uint16_t height = current_video_mode_height;
+
+    // Смещение в видеопамяти для текущей страницы
+    uint8_t* b1 = (uint8_t*)VGA_FRAMBUFFER_WINDOW_START;
+    b1 += text_page * VGA_FRAMBUFFER_WINDOW_SIZE;
+
+    const uint16_t blank_char = (attr << 8) | ' ';  // Пробел с атрибутами
+
+    if (!AL) {
+        u16* t_buf = (u16*)b1;
+        int size = width * height;
+        while (size--) *t_buf++ = blank_char;
+        return 0;
+    }
+
+    // Прокрутка содержимого окна
+    const uint8_t* window_start = b1 + (CH * width + CL) * 2;  // Начало окна (с учетом позиционирования)
+    const uint8_t* window_end = b1 + (DH * width + DL) * 2;    // Конец окна (с учетом позиционирования)
+
+    const uint16_t window_height = DH - CH + 1;  // Высота окна
+    const uint16_t scroll_lines = AL;  // Количество строк для прокрутки
+
+    // Прокручиваем строки в пределах окна
+    if (scroll_lines > 0) {
+        const uint8_t* src = window_end - (scroll_lines * width * 2); // Источник для копирования
+        uint8_t* dest = window_end - (scroll_lines * width * 2);  // Куда копировать
+        size_t sz = width * 2 * (window_height - scroll_lines);
+        memcpy(dest, src, sz);  // Копирование области
+        // Очистка верхней части окна
+        u16* clear_area = (u16*)window_start;
+        for (uint16_t row = 0; row < scroll_lines; ++row) {
+            for (uint16_t col = 0; col < width; ++col) {
+                *clear_area++ = blank_char;
+            }
+        }
+    }
+    return 0;
+}
+
+/**
+ * VIDEO - READ CHARACTER AND ATTRIBUTE AT CURSOR POSITION
+ * AH = 08h
+ * BH = page number (00h to number of pages - 1) (see #00010)
+ * 
+ * Returns:
+ * AH = character's attribute (text mode only) (see #00014)
+ * AL = character
+ (Table 00015)
+Values for character color:.
+Normal          Bright
+000b   black           dark gray
+001b   blue            light blue
+010b   green           light green
+011b   cyan            light cyan
+100b   red             light red
+101b   magenta         light magenta
+110b   brown           yellow
+111b   light gray      white
+ */
+inline static u32 x86_int10_hanler_08(u32 ebx) {
+    if (BH > 7) return 0;
+    u16* BDA = (u16*)X86_FAR_PTR(0x0040, 0x0050);
+    u16 edx = BDA[BH];
+    // DH = row (00h is top)
+    // DL = column (00h is left)
+    uint8_t* b1 = (uint8_t*)VGA_FRAMBUFFER_WINDOW_START;
+    b1 += BH * VGA_FRAMBUFFER_WINDOW_SIZE;
+    uint16_t* b16 = (uint16_t*)b1;
+    return b16[current_video_mode_width * DH + DL];
+}
+
+/**
+ * VIDEO - WRITE CHARACTER AND ATTRIBUTE AT CURSOR POSITION
+ * AH = 09h
+ * AL = character to display
+ * BH = page number (00h to number of pages - 1) (see #00010)
+ * background color in 256-color graphics modes (ET4000)
+ * BL = attribute (text mode) or color (graphics mode)
+ * if bit 7 set in <256-color graphics mode, character is XOR'ed onto screen
+ * CX = number of times to write character
+ * Returns: Nothing
+ */
+inline static u32 x86_int10_hanler_09(u32 eax, u32 ebx, u32 ecx) {
+    if (BH > 7) return 0;
+    u16* BDA = (u16*)X86_FAR_PTR(0x0040, 0x0050);
+    u16 edx = BDA[BH];
+    u16 row = DH;
+    u16 column = DL;
+    u8* b1 = (u8*)VGA_FRAMBUFFER_WINDOW_START;
+    b1 += BH * VGA_FRAMBUFFER_WINDOW_SIZE;
+    u16 width = current_video_mode_width;
+    u16 heigh = current_video_mode_height;
+    u16* b16 = (u16*)b1;
+    b16 += width * row + column;
+    u16 c = ((u16)BL << 8) | AL;
+    for (u16 i = 0; i < CX; ++i) {
+        *b16++ = c;
+        ++column;
+        if (column >= width) {
+            column = 0;
+            ++row;
+        }
+        if (row >= heigh) {
+            break;
+        }
+    }
+r:
+    BDA[BH] = (row << 8) | column;
+    return 0;
+}
+
 u32 x86_int10_hanler_C(u32 eax, u32 ebx, u32 ecx, u32 edx) {
-    goutf(current_video_mode_height - 1, false, "x86_int10_hanler_C(%08X, %08X, %08X, %08X)", eax, ebx, ecx, edx);
+   // goutf(current_video_mode_height - 1, false, "x86_int10_hanler_C(%08X, %08X, %08X, %08X)", eax, ebx, ecx, edx);
     switch (AH) { // AH - function
         case 0:
             return x86_int10_hanler_00(eax);
@@ -164,6 +418,16 @@ u32 x86_int10_hanler_C(u32 eax, u32 ebx, u32 ecx, u32 edx) {
             return x86_int10_hanler_02(ebx, edx);
         case 3:
             return x86_int10_hanler_03(ebx);
+        case 5:
+            return x86_int10_hanler_05(eax);
+        case 6:
+            return x86_int10_hanler_06(eax, ebx, ecx, edx);
+        case 7:
+            return x86_int10_hanler_07(eax, ebx, ecx, edx);
+        case 8:
+            return x86_int10_hanler_08(ebx);
+        case 9:
+            return x86_int10_hanler_09(eax, ebx, ecx);
     }
     return 0;
 }

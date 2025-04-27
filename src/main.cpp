@@ -16,26 +16,7 @@
 
 #include "x86.h"
 
-#ifdef ZERO
-#undef PICO_DEFAULT_LED_PIN
-// TODO:
-#endif
-
-#ifdef HDMIA
-    #include "common_dvi_pin_configs.h"
-    #include "dvi.h"
-    extern "C" {
-        #include "tmds_encode.h"
-    }
-    #define FRAME_WIDTH 320
-    #define FRAME_HEIGHT 240
-    #define DVI_TIMING dvi_timing_640x480p_60hz
-    extern "C" struct dvi_inst dvi0;
-    #define N_SCANLINE_BUFFERS 6
-    uint16_t __attribute__((aligned(4))) static_scanbuf[N_SCANLINE_BUFFERS][FRAME_WIDTH];
-#endif
-
-extern "C" volatile int y = 0;
+void get_cpu_flash_jedec_id(uint8_t _rx[4]);
 
 #include "psram_spi.h"
 #include "nespad.h"
@@ -505,13 +486,13 @@ static const char* get_volt() {
 #include <hardware/exception.h>
 
 void sigbus(void) {
-    goutf(y++, true, "SIGBUS exception caught...");
+    goutf(30-1, true, "SIGBUS exception caught...");
     // reset_usb_boot(0, 0);
 }
 void __attribute__((naked, noreturn)) __printflike(1, 0) dummy_panic(__unused const char *fmt, ...) {
-    goutf(y++, true, "*** PANIC ***");
+    goutf(30-2, true, "*** PANIC ***");
     if (fmt)
-        goutf(y++, true, fmt);
+        goutf(30-1, true, fmt);
 }
 
 #ifdef HDMIA
@@ -915,7 +896,7 @@ int main() {
         cd_card_mount = true;
         f_mkdir(HOME_DIR);
     } else {
-        draw_text("SDCARD not connected", 0, y++, 12, 0);
+        draw_text("SDCARD not connected", 0, 0, 12, 0);
     }
 
 ///    draw_text("Init keyboard", 0, TEXTMODE_ROWS - 1, 7, 0);
@@ -924,8 +905,6 @@ int main() {
 //    keyboard_init();
     sleep_ms(50);
 
-#if PICO_RP2350
-    #ifdef BUTTER_PSRAM_GPIO
     uint32_t psram32 = butter_psram_size();
     no_butterbod = psram32 == 0;
     goutf(0, true, "Murmulator VGA/HDMI BIOS for RP2350 378 MHz 1.6V");
@@ -952,24 +931,18 @@ int main() {
         speedr = d * a * sizeof(uint32_t) / elapsed;
         goutf(1, false, "PSRAM (on GPIO-%d) %d MB %f/%f MBps", BUTTER_PSRAM_GPIO, psram32 >> 20, speedw, speedr);
     }
-
-    #endif
-#endif
-///    draw_text("Init NESPAD  ", 0, TEXTMODE_ROWS - 1, 7, 0);
-    nespad_begin(clock_get_hz(clk_sys) / 1000, NES_GPIO_CLK, NES_GPIO_DATA, NES_GPIO_LAT);
-    sleep_ms(50);
-
-#if 0
-    if (!isInterrupted()) {
-//        draw_text("Test FLASH   ", 0, TEXTMODE_ROWS - 1, 7, 0);
+    if (0)
+    {
         uint8_t rx[4];
         get_cpu_flash_jedec_id(rx);
         uint32_t flash_size = (1 << rx[3]);
-        goutf(y++, false, "FLASH %d MB; JEDEC ID: %02X-%02X-%02X-%02X",
+        goutf(30-1, false, "FLASH %d MB; JEDEC ID: %02X-%02X-%02X-%02X",
                  flash_size >> 20, rx[0], rx[1], rx[2], rx[3]
         );
     }
-#endif
+
+    nespad_begin(clock_get_hz(clk_sys) / 1000, NES_GPIO_CLK, NES_GPIO_DATA, NES_GPIO_LAT);
+    sleep_ms(50);
 skip_it:
 #if 0
     draw_text("         Red on White        ", 0, y++, 12, 15);
@@ -981,17 +954,6 @@ skip_it:
     draw_text("      Yellow on LightBlue    ", 0, y++, 6, 11);
     draw_text("       White on LightMagenta ", 0, y++, 15, 13);
     draw_text(" LightYellow on Gray         ", 0, y++, 14, 7);
-
-    ///cli                 ; отключаем прерывания
-    __asm volatile ("cpsid i" : : : "memory"); // __disable_irq();
-    ///sti                 ; снова включаем прерывания
-    __asm volatile ("cpsie i" : : : "memory"); // __enable_irq();
-    /// cld/std - запомнить флаг направления MOVS и подобных операций
-
-    /// xor ax, ax
-    __asm volatile ("eor r0, r0, r0" : : : "memory");
-    /// mov     ds, ax - сегметы как будем кодировать?
-    /// mov     bp, BASE (0x7c00)
 #endif
 
     gpio_init(PICO_DEFAULT_LED_PIN);
@@ -1005,9 +967,8 @@ skip_it:
 
     x86_init();
 
-    y = 0;
     u32 eax = x86_int10(0, 0, 0, 0);
-    goutf(30-1, false, "INT 10 AH=0 rc: %08X", eax);
+    goutf(30-3, false, "INT 10 AH=0 rc: %08X", eax);
 #if 0
     u32 eax = x86_int13(0, 0, 0, 0);
     goutf(y++, false, "INT 13 AH=0 rc: %08X", eax);
@@ -1054,89 +1015,7 @@ skip_it:
     }
     */
 
-///    uint8_t ov = *(uint8_t*)&gamepad1_bits;
     while(true) {
-#if 0
-        #if SDCARD_INFO        
-        if (pressed_key[HID_KEY_D]) { // D is down (SD CARD info)
-            clrScr(0);
-            y = 0;
-            get_sdcard_info();
-            footer();
-        } else
-        #endif
-        if (pressed_key[HID_KEY_F]) { // F is down (Flash info)
-            clrScr(0);
-            y = 0;
-            get_flash_info();
-            footer();
-        }
-        else if (pressed_key[HID_KEY_P]) { // P is down (PSRAM info)
-            clrScr(0);
-            y = 0;
-            print_psram_info();
-            footer();
-        }
-        uint32_t nstate = nespad_state;
-        uint32_t nstate2 = nespad_state2;
-        bool S = isSpeaker();
-        bool I = isI2S();
-        bool L = pressed_key[HID_KEY_L] || (nstate & DPAD_SELECT) || (nstate2 & DPAD_SELECT) || (mouse_buttons & MOUSE_BUTTON_LEFT ) || gamepad1_bits.select;
-        bool R = pressed_key[HID_KEY_R] || (nstate &  DPAD_START) || (nstate2 &  DPAD_START) || (mouse_buttons & MOUSE_BUTTON_RIGHT) || gamepad1_bits.start;
-        if (!i2s_1nit && (S || R || L)) {
-            if (!pwm_1nit) {
-                PWM_init_pin(BEEPER_PIN, (1 << 12) - 1);
-                PWM_init_pin(PWM_PIN0  , (1 << 12) - 1);
-                PWM_init_pin(PWM_PIN1  , (1 << 12) - 1);
-                pwm_1nit = true;
-                footer();
-            }
-            if (S) pwm_set_gpio_level(BEEPER_PIN, (1 << 12) - 1);
-            if (R) pwm_set_gpio_level(PWM_PIN0  , (1 << 12) - 1);
-            if (L) pwm_set_gpio_level(PWM_PIN1  , (1 << 12) - 1);
-            sleep_ms(1);
-            if (S) pwm_set_gpio_level(BEEPER_PIN, 0);
-            if (R) pwm_set_gpio_level(PWM_PIN0  , 0);
-            if (L) pwm_set_gpio_level(PWM_PIN1  , 0);
-            sleep_ms(1);
-        }
-        else if (!pwm_1nit && I) {
-            if (!i2s_1nit) {
-                i2s_config.dma_trans_count = samples >> 1;
-                i2s_init(&i2s_config);
-                for (int i = 0; i < samples; ++i) {
-                    int16_t v = std::sin(2 * 3.1415296 * i / samples) * 32767;
-            
-                    samplesL[i][0] = v;
-                    samplesL[i][1] = 0;
-            
-                    samplesR[i][0] = 0;
-                    samplesR[i][1] = v;
-            
-                    samplesLR[i][0] = v;
-                    samplesLR[i][1] = v;
-                }
-                i2s_1nit = true;
-                footer();
-            }
-        }
-        else if (i2s_1nit && (L || R)) {
-            i2s_dma_write(
-                &i2s_config,
-                (int16_t*)(L && R ? samplesLR : (L ? samplesL : samplesR))
-            );
-        }
-        else {
-            sleep_ms(100);
-        }
-        if (nstate != nespad_state || nstate2 != nespad_state2) {
-            goutf(TEXTMODE_ROWS - 2, false, "NES PAD: %04Xh %04Xh                                ", nespad_state, nespad_state2);
-        }
-        uint8_t nv = *(uint8_t*)&gamepad1_bits;
-        if (nv != ov) {
-            goutf(TEXTMODE_ROWS - 2, false, "USB PAD: %02Xh                                      ", nv);
-        }
-#endif
     }
     __unreachable();
 }
