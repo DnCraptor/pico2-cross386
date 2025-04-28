@@ -1174,7 +1174,8 @@ int main() {
         begin = time_us_32();
         for (a = 0; a < psram32 / sizeof(uint32_t); ++a) {
             if (a  != p32[a]) {
-                goutf(1, true, " PSRAM write/read test failed at %ph", p32 + a);
+                // only for debug mode
+                goutf(0, true, " PSRAM write/read test failed at %ph", p32 + a);
                 break;
             }
         }
@@ -1204,8 +1205,9 @@ int main() {
         sleep_ms(23);
         gpio_put(PICO_DEFAULT_LED_PIN, false);
     }
+    
     x86_init();
-    u32 eax = x86_int10_wrapper(0x0003, 0, 0, 0); // try mode 3
+    x86_int10_wrapper(0x0003, 0, 0, 0); // try mode 3
 
     int y = 0;
     gprintf(y++, 12, 15, "Murmulator VGA/HDMI BIOS for RP2350 378 MHz 1.6V");
@@ -1242,16 +1244,20 @@ int main() {
         begin = time_us_32();
         for (a = 0; a < psram32; a += 4) {
             if (a != read32psram(a)) {
-                goutf(1, true, "32-bit read failed at %ph", a);
+                gprintf(y++, 12, 0, "PSRAM #2 read failed at %ph", a);
                 break;
             }
         }
         elapsed = time_us_32() - begin;
         speedw = d * a / elapsed;
-        gprintf(y++, 7, 0, "PSRAM #2 for EMS r/w speed: %f/%f MBps", speedw, speedr);
+        gprintf(y++, 7, 0, "PSRAM #2 for EMS; W/R 32: %f/%f MBps", speedw, speedr);
     } else {
         gprintf(y++, 7, 0, "No PSRAM #2 for EMS detected");
     }
+    u32 eax = x86_int10_wrapper(0x0F00, 0, 0, 0); // get videomode
+    gprintf(y++, 7, 0, "Video mode: %d (%d columns)", (u8)eax, (u8)(eax >> 8));
+    gprintf(y++, 7, 0, "Virtual 2xFDD 4xHDD (images in '/cross' folder)");
+
     u32 i = 0;
     while(1) {
         eax = x86_int16_wrapper(0, 0, 0, 0);
