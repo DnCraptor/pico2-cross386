@@ -1,5 +1,6 @@
-#include "graphics.h"
 #include <string.h>
+#include <stdarg.h>
+#include "graphics.h"
 #include "x86.h"
 
 bool SELECT_VGA = true;
@@ -134,4 +135,22 @@ void clrScr(const uint8_t bgColor) {
 
 void clrBuf(void) {
     memset(SCREEN, 0, sizeof(SCREEN));
+}
+
+void goutf(int outline, bool err, const char *__restrict str, ...) {
+    va_list ap;
+    char buf[80];
+    va_start(ap, str);
+    vsnprintf(buf, 80, str, ap);
+    va_end(ap);
+    draw_debug_text(buf, 0, outline, err ? 12 : 7, 0);
+}
+
+void gprintf(int outline, uint8_t color, uint8_t bgColor, const char *__restrict str, ...) {
+    va_list ap;
+    char buf[80];
+    va_start(ap, str);
+    vsnprintf(buf, 80, str, ap);
+    va_end(ap);
+    draw_text(buf, 0, outline, color, bgColor);
 }

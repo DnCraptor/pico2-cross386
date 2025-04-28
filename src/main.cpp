@@ -33,15 +33,6 @@ void get_flash_info();
 void get_sdcard_info();
 void get_cpu_flash_jedec_id(uint8_t _rx[4]);
 
-extern "C" void goutf(int outline, bool err, const char *__restrict str, ...) {
-    va_list ap;
-    char buf[80];
-    va_start(ap, str);
-    vsnprintf(buf, 80, str, ap);
-    va_end(ap);
-    draw_debug_text(buf, 0, outline, err ? 12 : 7, 0);
-}
-
 struct input_bits_t {
     bool a: true;
     bool b: true;
@@ -564,6 +555,9 @@ void __not_in_flash_func(process_kbd_report)(
                             // Пример: Pause клавиша
                             ascii = 0;
                             break;
+                        case HID_KEY_RETURN:
+                            ascii = 0x0D;
+                            break;
                         case HID_KEY_INSERT:
                             // Пример: Insert клавиша
                             ascii = 0;
@@ -625,8 +619,7 @@ void __not_in_flash_func(process_kbd_report)(
                             ascii = numLock ? '+' : 0;
                             break;
                         case HID_KEY_KEYPAD_ENTER:
-                            // Пример: Keypad Enter клавиша
-                            ascii = 0;
+                            ascii = 0x0D;
                             break;
                         case HID_KEY_KEYPAD_1:
                         case HID_KEY_KEYPAD_2:
@@ -657,8 +650,7 @@ void __not_in_flash_func(process_kbd_report)(
             }
         }
 
-        // Добавляем символ в буфер, если ASCII код корректен
-        if (ascii != 0) {
+        if (scan != 0) {
             // Добавляем в буфер
             x86_add_char_to_BDA(scan, ascii);  // Функция для добавления в буфер
         }
@@ -932,6 +924,26 @@ static void format_hdd_test(int y) {
     }
 }
 
+static void format_fdd(int y) {
+    u8* buff = X86_FAR_PTR(X86_ES, 0x1000);
+    for (u32 track = 0; track < 80; ++track) {
+        for (u32 head = 0; head < 2; ++head) {
+            for (u32 sector = 0; sector < 18; ++sector) {
+                buff[sector * 4 + 0] = track;         // Track number
+                buff[sector * 4 + 1] = head;          // Head number
+                buff[sector * 4 + 2] = sector + 1;    // Sector number (начинается с 1)
+                buff[sector * 4 + 3] = 2;             // 512 bytes per sector
+            }
+            u32 eax = (5 << 8) | 18;   // AH=05h, AL=кол-во секторов
+            u32 ebx = 0x1000;          // смещение 0x1000 в сегменте ES
+            u32 ecx = (track << 8);    // CH=track, CL=0 пока
+            u32 edx = (head << 8);     // DH=head, DL=0 (диск 0)
+            u32 status = x86_int13_wrapper(eax, ebx, ecx, edx);
+            goutf(y, false, "INT 13 AH=5 format [%d:%d:1-18] rc: %08X", track, head, status);
+        }
+    }
+}
+
 // connection is possible 00->00 (external pull down)
 static int test_0000_case(uint32_t pin0, uint32_t pin1, int res) {
     gpio_init(pin0);
@@ -1105,6 +1117,8 @@ static int testPins(uint32_t pin0, uint32_t pin1) {
     return res;
 }
 
+static FATFS fs;
+
 int main() {
     volatile uint32_t *qmi_m0_timing=(uint32_t *)0x400d000c;
     vreg_disable_voltage_limit();
@@ -1134,12 +1148,9 @@ int main() {
     multicore_launch_core1(render_core);
     sem_release(&vga_start_semaphore);
 
-    FATFS fs;
     if (f_mount(&fs, "SD", 1) == FR_OK) {
         cd_card_mount = true;
         f_mkdir(HOME_DIR);
-    } else {
-        draw_text("SDCARD not connected", 0, 0, 12, 0);
     }
 
     tuh_init(BOARD_TUH_RHPORT);
@@ -1148,13 +1159,12 @@ int main() {
     sleep_ms(50);
 
     uint32_t psram32 = butter_psram_size();
-    goutf(0, true, "Murmulator VGA/HDMI BIOS for RP2350 378 MHz 1.6V");
+    double speedw, speedr;
     {
         uint32_t a = 0;
         uint32_t elapsed;
         uint32_t begin = time_us_32();
         double d = 1.0;
-        double speedw, speedr;
         uint32_t* p32 = (uint32_t*)PSRAM_DATA;
         for (; a < psram32 / sizeof(uint32_t); ++a) {
             p32[a] = a;
@@ -1165,26 +1175,15 @@ int main() {
         for (a = 0; a < psram32 / sizeof(uint32_t); ++a) {
             if (a  != p32[a]) {
                 goutf(1, true, " PSRAM write/read test failed at %ph", p32 + a);
-                goto skip_it;
+                break;
             }
         }
         elapsed = time_us_32() - begin;
         speedr = d * a * sizeof(uint32_t) / elapsed;
-        goutf(1, false, "PSRAM (on GPIO-%d) %d MB %f/%f MBps", BUTTER_PSRAM_GPIO, psram32 >> 20, speedw, speedr);
-    }
-    if (0)
-    {
-        uint8_t rx[4];
-        get_cpu_flash_jedec_id(rx);
-        uint32_t flash_size = (1 << rx[3]);
-        goutf(30-1, false, "FLASH %d MB; JEDEC ID: %02X-%02X-%02X-%02X",
-                 flash_size >> 20, rx[0], rx[1], rx[2], rx[3]
-        );
     }
 
     nespad_begin(clock_get_hz(clk_sys) / 1000, NES_GPIO_CLK, NES_GPIO_DATA, NES_GPIO_LAT);
     sleep_ms(50);
-skip_it:
 #if 0
     draw_text("         Red on White        ", 0, y++, 12, 15);
     draw_text("        Blue on Green        ", 0, y++, 1, 2);
@@ -1205,76 +1204,62 @@ skip_it:
         sleep_ms(23);
         gpio_put(PICO_DEFAULT_LED_PIN, false);
     }
-
     x86_init();
-
-    format_hdd_test(0);
-
     u32 eax = x86_int10_wrapper(0x0003, 0, 0, 0); // try mode 3
+
+    int y = 0;
+    gprintf(y++, 12, 15, "Murmulator VGA/HDMI BIOS for RP2350 378 MHz 1.6V");
+    gprintf(y++, 7, 0, "PSRAM (on GPIO-%d) %d MB %f/%f MBps", BUTTER_PSRAM_GPIO, psram32 >> 20, speedw, speedr);
+    if (!cd_card_mount) {
+        draw_text("SDCARD not connected", 0, y++, 12, 0);
+    } else {
+        gprintf(y++, 7, 0, "SDCARD %d FATs; %d free clusters (%d KB each)", fs.n_fats, f_getfree32(&fs), fs.csize >> 1);
+    }
+    {
+        uint8_t rx[4];
+        get_cpu_flash_jedec_id(rx);
+        uint32_t flash_size = (1 << rx[3]);
+        gprintf(y++, 7, 0, "FLASH %d MB; JEDEC ID: %02X-%02X-%02X-%02X", flash_size >> 20, rx[0], rx[1], rx[2], rx[3]);
+    }
+    // other PSRAM
+    init_psram();
+    uint32_t psram2_32 = psram_size();
+    if (psram2_32) {
+        uint8_t rx8[8];
+        psram_id(rx8);
+        gprintf(y++, 7, 0, "PSRAM #2 %d MB MFID:%02X KGD:%02X EID:%02X%02X-%02X%02X-%02X%02X",
+            psram2_32 >> 20, rx8[0], rx8[1], rx8[2], rx8[3], rx8[4], rx8[5], rx8[6], rx8[7]
+        );
+        double d = 1.0;
+        uint32_t a = 0;
+        uint32_t elapsed;
+        uint32_t begin = time_us_32();
+        for (a = 0; a < psram32; a += 4) {
+            write32psram(a, a);
+        }
+        elapsed = time_us_32() - begin;
+        speedr = d * a / elapsed;
+        begin = time_us_32();
+        for (a = 0; a < psram32; a += 4) {
+            if (a != read32psram(a)) {
+                goutf(1, true, "32-bit read failed at %ph", a);
+                break;
+            }
+        }
+        elapsed = time_us_32() - begin;
+        speedw = d * a / elapsed;
+        gprintf(y++, 7, 0, "PSRAM #2 for EMS r/w speed: %f/%f MBps", speedw, speedr);
+    } else {
+        gprintf(y++, 7, 0, "No PSRAM #2 for EMS detected");
+    }
     u32 i = 0;
     while(1) {
         eax = x86_int16_wrapper(0, 0, 0, 0);
-     //   goutf(30-3, false, "INT 16 AH=00 rc: %08X (%d)", eax, i++);
-      //  if (eax)
-        //    sleep_ms(1000);
-      //  else
-      static int i = 0;
-      u8 ascii = (u8)eax;
-      u8 scan = (u8)(eax >> 8);
-      goutf(30-3, false, "R %02X[%c]/%02X (%d)", ascii, ascii, scan, i++);
+        static int i = 0;
+        u8 ascii = (u8)eax;
+        u8 scan = (u8)(eax >> 8);
+        goutf(30-3, false, "R %02X[%c]/%02X (%d)", ascii, ascii, scan, i++);
     }
-#if 0
-    u32 eax = x86_int10(0x0000, 0, 0, 0); // try mode 0
-    eax = x86_int10(0x0003, 0, 0, 0); // try mode 3
-    eax = x86_int10(0x0F00, 0, 0, 0); // show mode in result
-    goutf(30-3, false, "INT 10 AH=0F rc: %08X", eax);
 
-    u32 eax = x86_int13(0, 0, 0, 0);
-    goutf(y++, false, "INT 13 AH=0 rc: %08X", eax);
-    eax = x86_int13(1 << 8, 0, 0, 0);
-    goutf(y++, false, "INT 13 AH=1 rc: %08X", eax);
-
-    u8* buff = X86_FAR_PTR(X86_ES, 0x1000);
-    for (int i = 0; i < 512; ++i)
-        buff[i] = (u8)i;
-
-    eax = x86_int13((3 << 8) | 1, 0x1000, 1, 0);
-    goutf(y++, false, "INT 13 AH=3 AL=1 CL=1 ES:BX=[%04X:1000] rc: %08X", X86_ES, eax);
-    
-    eax = x86_int13((2 << 8) | 1, 0x1000, 1, 0);
-    goutf(y++, false, "INT 13 AH=2 AL=1 CL=1 ES:BX=[%04X:1000] rc: %08X", X86_ES, eax);
-
-    for (u32 track = 0; track < 80; ++track) {
-        for (u32 head = 0; head < 2; ++head) {
-            for (u32 sector = 0; sector < 18; ++sector) {
-                buff[sector * 4 + 0] = track;         // Track number
-                buff[sector * 4 + 1] = head;          // Head number
-                buff[sector * 4 + 2] = sector + 1;    // Sector number (начинается с 1)
-                buff[sector * 4 + 3] = 2;             // 512 bytes per sector
-            }
-            u32 eax = (5 << 8) | 18;   // AH=05h, AL=кол-во секторов
-            u32 ebx = 0x1000;          // смещение 0x1000 в сегменте ES
-            u32 ecx = (track << 8);    // CH=track, CL=0 пока
-            u32 edx = (head << 8);     // DH=head, DL=0 (диск 0)
-            u32 status = x86_int13(eax, ebx, ecx, edx);
-            goutf(y, false, "INT 13 AH=5 format [%d:%d:1-18] rc: %08X", track, head, status);
-        }
-    }
-    y++;
-    format_hdd_test(y++);
-#endif
-    /*
-    uint32_t entry_iret_official = (uint32_t)PSRAM_DATA + 0xff53;
-    {
-        uint16_t* code = reinterpret_cast<uint16_t*>(entry_iret_official);        
-        code[0] = 0x4800;  // LDR r0, [PC, #0] (но PC указывает на addr+4), r0=iret_ptr
-        code[1] = 0x4700;  // BX r0
-        uint32_t* addr = reinterpret_cast<uint32_t*>(entry_iret_official + 4);
-        *addr = reinterpret_cast<uint32_t>(iret_ptr);
-    }
-    */
-
-    while(true) {
-    }
     __unreachable();
 }
