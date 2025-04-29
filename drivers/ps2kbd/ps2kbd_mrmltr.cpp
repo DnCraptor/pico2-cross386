@@ -358,9 +358,13 @@ void Ps2Kbd_Mrmltr::tick() {
     uint32_t code = (rc << 2) >> 24;
   //  goutf(30-1, false, "PS/2 keycode %2.2lX (%ld)", code, code);
 
-    X86_PORTS[0x60] = (u8)code;
-    X86_PORTS[0x62] |= 2;
-    X86_IRQ1();
+    if (X86_PORTS[0x62] & 2) {
+      // ignore - prev is not yet read/ready
+    } else {
+      X86_PORTS[0x60] = (u8)code;
+      X86_PORTS[0x62] |= 2;
+      X86_IRQ1();
+    }
     // TODO Handle PS/2 overflow/error messages
     /*
     switch (code) {

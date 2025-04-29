@@ -1,5 +1,6 @@
 #include <string.h>
 #include "x86.h"
+#include "ports.h"
 #include "graphics.h"
 
 u16 X86_CS = 0xF000;
@@ -23,6 +24,30 @@ static void ints(void) {
     X86_BASE_RAM[0x13] = (uint32_t)&x86_int13_hanler;
     X86_BASE_RAM[0x15] = (uint32_t)&x86_int15_hanler;
     X86_BASE_RAM[0x16] = (uint32_t)&x86_int16_hanler;
+}
+
+/**
+ * 0x20 = IRQ0 (таймер),
+ * 0x21 = IRQ1 (клавиатура),
+ * ...,
+ * 0x2F = IRQ15 (всего 16 IRQ)
+ */
+static void irqs(void) {
+    // Master PIC
+    x86_port_hanle8_C(0x20, 0x11); // ICW1: Начинаем инициализацию, ожидаем ICW4
+// XT case    x86_port_hanle8_C(0x21, 0x08); // ICW2: Базовый вектор прерываний 08h
+    x86_port_hanle8_C(0x21, 0x20); // ICW2: Базовый вектор прерываний 20h
+    x86_port_hanle8_C(0x21, 0x04); // ICW3: Подчиненный контроллер на IRQ2
+    x86_port_hanle8_C(0x21, 0x01); // ICW4: Режим 8086/88
+    // Slave PIC
+    x86_port_hanle8_C(0xA0, 0x11); // ICW1: Начинаем инициализацию, ожидаем ICW4
+// XT case    x86_port_hanle8_C(0xA1, 0x08); // ICW2: Базовый вектор прерываний 08h
+    x86_port_hanle8_C(0xA1, 0x28); // ICW2: Базовый вектор прерываний 28h
+    x86_port_hanle8_C(0xA1, 0x02); // ICW3: Подключен к IRQ2 на master (bit 2)
+    x86_port_hanle8_C(0xA1, 0x01); // ICW4: Режим 8086/88
+
+    x86_port_hanle8_C(0x21, 0xFD); // 11111101b — разрешен только IRQ1
+    x86_port_hanle8_C(0xA1, 0xFF); // Все IRQ на slave отключены
 }
 
 static void post(void) {
@@ -91,6 +116,7 @@ void x86_init(void) {
     X86_SS = 0;
     X86_CR0 = 0x00000010; // PE=0, ET=1
     ints();
+    irqs();
     post();
 }
 
