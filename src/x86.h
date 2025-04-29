@@ -1,3 +1,6 @@
+#ifndef X86_H
+#define X86_H
+
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -117,3 +120,5 @@ void x86_update_kbd_BDA(u8 keyboard_status, u8 extended_status);
 #ifdef __cplusplus
 }
 #endif
+
+#endif // X86_H

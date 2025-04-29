@@ -61,7 +61,6 @@ public:
     std::function<void(hid_keyboard_report_t *curr, hid_keyboard_report_t *prev)> keyHandler);
   
   void init_gpio();
-  
   void __not_in_flash_func(tick)();
 };
 

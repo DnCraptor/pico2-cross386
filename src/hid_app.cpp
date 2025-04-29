@@ -58,7 +58,7 @@ struct input_bits_t {
 ///extern input_bits_t keyboard_bits;
 extern input_bits_t gamepad1_bits;
 
-void process_kbd_report(
+void process_kbd_usb_report(
   hid_keyboard_report_t const *report,
   hid_keyboard_report_t const *prev_report
 );
@@ -118,7 +118,7 @@ void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t cons
   {
     case HID_ITF_PROTOCOL_KEYBOARD:
       TU_LOG2("HID receive boot keyboard report\r\n");
-      process_kbd_report( (hid_keyboard_report_t const*) report, &prev_report );
+      process_kbd_usb_report( (hid_keyboard_report_t const*) report, &prev_report );
       prev_report = *(hid_keyboard_report_t const*)report;
     break;
 
@@ -249,7 +249,7 @@ static void process_generic_report(uint8_t dev_addr, uint8_t instance, uint8_t c
       case HID_USAGE_DESKTOP_KEYBOARD:
         TU_LOG1("HID receive keyboard report\r\n");
         // Assume keyboard follow boot report layout
-        process_kbd_report( (hid_keyboard_report_t const*) report, &prev_report );
+        process_kbd_usb_report( (hid_keyboard_report_t const*) report, &prev_report );
         prev_report = *(hid_keyboard_report_t const*)report;
       break;
 

@@ -448,7 +448,7 @@ inline static bool isInReport(hid_keyboard_report_t const *report, const unsigne
     return false;
 }
 
-void __not_in_flash_func(process_kbd_report)(
+void __not_in_flash_func(process_kbd_usb_report)(
     hid_keyboard_report_t const *report,
     hid_keyboard_report_t const *prev_report
 ) {
@@ -714,12 +714,6 @@ void __not_in_flash_func(process_kbd_report)(
 }
 #endif
 
-Ps2Kbd_Mrmltr ps2kbd(
-    pio1,
-    KBD_CLOCK_PIN,
-    process_kbd_report
-);
-
 ///static uint16_t dma_buffer[22050 / 60];
 static i2s_config_t i2s_config = {
     .sample_freq = 22050,
@@ -745,8 +739,6 @@ void __time_critical_func(render_core)() {
     graphics_set_offset(0, 0);
     graphics_set_flashmode(false, false);
     graphics_set_mode(TEXTMODE_DEFAULT);
-//    graphics_set_buffer(buffer, TEXTMODE_COLS, TEXTMODE_ROWS);
-//    graphics_set_textbuffer(buffer);
     clrScr(0);
     sem_acquire_blocking(&vga_start_semaphore);
     // 60 FPS loop
@@ -760,18 +752,8 @@ void __time_critical_func(render_core)() {
 #ifdef TFT
             refresh_lcd();
 #endif
-            /**
-            if (i2s_1nit && (Lpressed || Rpressed)) {
-                uint16_t out = (frame_no & 1) ? 0xFFFF : 0;
-                for (int i = 0; i < (sizeof(dma_buffer) / sizeof(uint16_t)); ) {
-                    dma_buffer[i++] = Lpressed ? out : 0;
-                    dma_buffer[i++] = Rpressed ? out : 0;
-                }
-                i2s_dma_write(&i2s_config, dma_buffer);
-            }
-            */
             last_frame_tick = tick;
-            ps2kbd.tick();
+          //  
         }
         tuh_task();
         tick = time_us_64();

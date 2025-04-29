@@ -16,6 +16,9 @@
 #endif
 #include "hardware/clocks.h"
 
+#include "ports.h"
+#include "8259A.h"
+
 #ifdef DEBUG_PS2
 #define DBG_PRINTF(...) printf(__VA_ARGS__)
 #else
@@ -194,6 +197,7 @@ inline static uint8_t hidKeyToMod(uint8_t hidKeyCode) {
 }
 
 void Ps2Kbd_Mrmltr::handleHidKeyPress(uint8_t hidKeyCode) {
+  if (!_keyHandler) return;
   hid_keyboard_report_t prev = _report;
   
   // Check the key is not alreay pressed
@@ -218,6 +222,7 @@ void Ps2Kbd_Mrmltr::handleHidKeyPress(uint8_t hidKeyCode) {
 }
 
 void Ps2Kbd_Mrmltr::handleHidKeyRelease(uint8_t hidKeyCode) {
+  if (!_keyHandler) return;
   hid_keyboard_report_t prev = _report;
   
   _report.modifier &= ~hidKeyToMod(hidKeyCode);
@@ -334,29 +339,33 @@ void Ps2Kbd_Mrmltr::handleActions() {
 
 void Ps2Kbd_Mrmltr::tick() {
   if (pio_sm_is_rx_fifo_full(_pio, _sm)) {
-    DBG_PRINTF("PS/2 keyboard PIO overflow\n");
+    //goutf(1, false, "PS/2 keyboard PIO overflow");
     _overflow = true;
     while (!pio_sm_is_rx_fifo_empty(_pio, _sm)) {
       // pull a scan code from the PIO SM fifo
-      uint32_t rc = _pio->rxf[_sm];    
-      printf("PS/2 drain rc %4.4lX (%ld)\n", rc, rc);
+      uint32_t rc = _pio->rxf[_sm];
+    //  goutf(30-1, false, "PS/2 drain rc %4.4lX", rc);
     }
-    clearHidKeys();
-    clearActions();
+ ///   clearHidKeys();
+ ///   clearActions();
   }
   
   while (!pio_sm_is_rx_fifo_empty(_pio, _sm)) {
     // pull a scan code from the PIO SM fifo
     uint32_t rc = _pio->rxf[_sm];    
-    DBG_PRINTF("PS/2 rc %4.4lX (%ld)\n", rc, rc);
+   // goutf(30-3, false, "PS/2 rc %4.4lX (%ld)", rc, rc);
     
     uint32_t code = (rc << 2) >> 24;
-    DBG_PRINTF("PS/2 keycode %2.2lX (%ld)\n", code, code);
+  //  goutf(30-1, false, "PS/2 keycode %2.2lX (%ld)", code, code);
 
+    X86_PORTS[0x60] = (u8)code;
+    X86_PORTS[0x62] |= 2;
+    X86_IRQ1();
     // TODO Handle PS/2 overflow/error messages
+    /*
     switch (code) {
       case 0xaa: {
-         DBG_PRINTF("PS/2 keyboard Self test passed\n");
+        // goutf(0, false, "PS/2 keyboard Self test passed");
          break;       
       }
       case 0xe1: {
@@ -384,7 +393,18 @@ void Ps2Kbd_Mrmltr::tick() {
         break;
       }
     }
+    */
   }
+}
+
+Ps2Kbd_Mrmltr ps2kbd(
+  pio1,
+  KBD_CLOCK_PIN,
+  0 // TODO: process_kbd_usb_report
+);
+
+static void __not_in_flash_func() KeyboardHandler(void) {
+  ps2kbd.tick();
 }
 
 // TODO Error checking and reporting
@@ -425,4 +445,6 @@ void Ps2Kbd_Mrmltr::init_gpio() {
     // Ready to go
     pio_sm_init(_pio, _sm, offset, &c);
     pio_sm_set_enabled(_pio, _sm, true);
+
+    gpio_set_irq_enabled_with_callback(_base_gpio, GPIO_IRQ_EDGE_RISE, true, (gpio_irq_callback_t)&KeyboardHandler);
 }
