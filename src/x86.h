@@ -121,8 +121,101 @@ uint32_t x86_raise_interrupt_wrapper(uint32_t eax) __attribute__((pcs("aapcs")))
 u32 x86_int10_hanler_C(u32 eax, u32 ebx, u32 ecx, u32 edx) __attribute__((pcs("aapcs")));
 u32 x86_int13_hanler_C(u32 eax, u32 ebx, u32 ecx, u32 edx) __attribute__((pcs("aapcs")));
 
-void x86_add_char_to_BDA(u8 scan, u8 ascii);
-void x86_update_kbd_BDA(u8 keyboard_status, u8 extended_status);
+void x86_add_char_to_BDA(u16 keycode);
+
+
+#define KF1_LAST_E1    (1<<0)
+#define KF1_LAST_E0    (1<<1)
+#define KF1_RCTRL      (1<<2)
+#define KF1_RALT       (1<<3)
+#define KF1_101KBD     (1<<4)
+struct __attribute__((packed)) segoff_s {
+    union {
+        struct {
+            u16 offset;
+            u16 seg;
+        };
+        u32 segoff;
+    };
+};
+
+struct __attribute__((packed)) bios_data_area_s {
+    // 40:00
+    u16 port_com[4];
+    u16 port_lpt[3];
+    u16 ebda_seg;
+    // 40:10
+    u16 equipment_list_flags;
+    u8 pad1;
+    u16 mem_size_kb;
+    u8 pad2;
+    u8 ps2_ctrl_flag;
+    u16 kbd_flag0;
+    u8 alt_keypad;
+    u16 kbd_buf_head;
+    u16 kbd_buf_tail;
+    // 40:1e
+    u8 kbd_buf[32];
+    u8 floppy_recalibration_status;
+    u8 floppy_motor_status;
+    // 40:40
+    u8 floppy_motor_counter;
+    u8 floppy_last_status;
+    u8 floppy_return_status[7];
+    u8 video_mode;
+    u16 video_cols;
+    u16 video_pagesize;
+    u16 video_pagestart;
+    // 40:50
+    u16 cursor_pos[8];
+    // 40:60
+    u16 cursor_type;
+    u8 video_page;
+    u16 crtc_address;
+    u8 video_msr;
+    u8 video_pal;
+    struct segoff_s jump;
+    u8 other_6b;
+    u32 timer_counter;
+    // 40:70
+    u8 timer_rollover;
+    u8 break_flag;
+    u16 soft_reset_flag;
+    u8 disk_last_status;
+    u8 hdcount;
+    u8 disk_control_byte;
+    u8 port_disk;
+    u8 lpt_timeout[4];
+    u8 com_timeout[4];
+    // 40:80
+    u16 kbd_buf_start_offset;
+    u16 kbd_buf_end_offset;
+    u8 video_rows;
+    u16 char_height;
+    u8 video_ctl;
+    u8 video_switches;
+    u8 modeset_ctl;
+    u8 dcc_index;
+    u8 floppy_last_data_rate;
+    u8 disk_status_controller;
+    u8 disk_error_controller;
+    u8 disk_interrupt_flag;
+    u8 floppy_harddisk_info;
+    // 40:90
+    u8 floppy_media_state[4];
+    u8 floppy_track[2];
+    u8 kbd_flag1;
+    u8 kbd_led;
+    struct segoff_s user_wait_complete_flag;
+    u32 user_wait_timeout;
+    // 40:A0
+    u8 rtc_wait_flag;
+    u8 other_a1[7];
+    struct segoff_s video_savetable;
+    u8 other_ac[4];
+    // 40:B0
+    u8 other_b0[5*16];
+};
 
 #ifdef __cplusplus
 }

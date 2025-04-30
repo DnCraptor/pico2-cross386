@@ -58,6 +58,7 @@ static void post(void) {
     for (int i = 0; i < 128; ++i) {
         BDA16[i] = 0;
     }
+    struct bios_data_area_s* bda_s = (struct bios_data_area_s*)BDA;
     /*  Расшифровка Equipment List (0x0410):
     Бит	Описание
     0-1	Количество дискетных приводов - 1 меньше реального количества:
@@ -73,11 +74,9 @@ static void post(void) {
     12-15	Количество последовательных портов:
     0 = нет портов, 1 = один порт и т.д.
     */
-    BDA16[8] = SELECT_VGA ? 0b001001 : 0b011001;
-    BDA16[8] = 0; /// TODO: 0x1234 = перезапуск, 0x0000 = холодный старт
-
-    u16* bda16 = (u16*)(BDA + 0x13);
-    *bda16 = 640; // 0x0413	Размер конвенциональной памяти (в килобайтах)
+    bda_s->equipment_list_flags = SELECT_VGA ? 0b001001 : 0b011001;
+    //BDA16[8] = 0; /// TODO: 0x1234 = перезапуск, 0x0000 = холодный старт
+    bda_s->mem_size_kb = 640; // 0x0413	Размер конвенциональной памяти (в килобайтах)
     
     //1Ah	WORD	Keyboard: ptr to next character in keyboard buffer
     //1Ch	WORD	Keyboard: ptr to first free slot in keyboard buffer
@@ -90,22 +89,32 @@ static void post(void) {
     // 0x044D	1 байт	Номер последней активной дискеты + 0x044E	1 байт	Статус дискеты (флаги, ошибок и пр.)
     // 0x044F	1 байт	Таймер моторчика дискеты
     // 0x0450	16 байт	Позиции курсора для всех видео страниц
-    BDA16 = (u16*)(BDA + 0x60);
+//    BDA16 = (u16*)(BDA + 0x60);
     // 0x0460	2 байта	Активная страница дисплея
-    BDA16[1] = 0xB800; // 0x0462	2 байта	Базовый адрес видеобуфера (0xB800, 0xB000)
-    BDA = X86_FAR_PTR(0x0040, 0x0064);
-    *BDA = current_video_mode; // 0x0464	1 байт	Режим работы видеоадаптера (номер режима)
-    BDA16 = (u16*)(BDA + 1); // 465h
-    BDA16[0] = current_video_mode_width; // 0x0465	2 байта	Количество столбцов (ширина экрана в символах)
-    BDA16[1] = 0xB800; // 0x0467	2 байта	Начальный адрес видеобуфера для скроллинга
-    BDA16[2] = current_video_mode_height - 1; // 0x0469	2 байта	Количество строк на экране (минус 1)
-    BDA16[3] = current_video_mode_width * 2; // 0x046B	2 байта	Количество байт на строку
-    BDA16[4] = 0x50; // 0x046D	2 байта	Адрес первого свободного сегмента памяти
-    BDA = X86_FAR_PTR(0x0040, 0x006F);
-    *BDA = 0; // 0x046F	1 байт	Режим дисплея: цветной/монохром
-    BDA16 = (u16*)(BDA + 1); // 470h
-    BDA16[0] = 4; // 0x0470	2 байта	Количество установленных жестких дисков
-    BDA16[1] = 0x1234; // 0x0472	2 байта	Завершение POST (значение 0x1234h при успехе)
+//    BDA16[1] = 0xB800; // 0x0462	2 байта	Базовый адрес видеобуфера (0xB800, 0xB000)
+//    BDA = X86_FAR_PTR(0x0040, 0x0064);
+
+    bda_s->video_mode = current_video_mode; // 0x0464	1 байт	Режим работы видеоадаптера (номер режима)
+//    BDA16 = (u16*)(BDA + 1); // 465h
+    bda_s->video_cols = current_video_mode_width; // 0x0465	2 байта	Количество столбцов (ширина экрана в символах)
+    bda_s->video_pagestart = 0xB800; // 0x0467	2 байта	Начальный адрес видеобуфера для скроллинга
+//    BDA16[2] = current_video_mode_height - 1; // 0x0469	2 байта	Количество строк на экране (минус 1)
+//    BDA16[3] = current_video_mode_width * 2; // 0x046B	2 байта	Количество байт на строку
+    bda_s->video_pagesize = current_video_mode_height * current_video_mode_width * 2;
+//    BDA16[4] = 0x50; // 0x046D	2 байта	Адрес первого свободного сегмента памяти
+//    BDA = X86_FAR_PTR(0x0040, 0x006F);
+//    *BDA = 0; // 0x046F	1 байт	Режим дисплея: цветной/монохром
+//    BDA16 = (u16*)(BDA + 1); // 470h
+//    BDA16[0] = 4; // 0x0470	2 байта	Количество установленных жестких дисков
+    bda_s->soft_reset_flag = 0x1234; // 0x0472	2 байта	Завершение POST (значение 0x1234h при успехе)
+
+    u16 x = offsetof(struct bios_data_area_s, kbd_buf);
+    bda_s->kbd_flag1 = KF1_101KBD;
+    bda_s->kbd_buf_head = x;
+    bda_s->kbd_buf_tail = x;
+    bda_s->kbd_buf_start_offset = x;
+    bda_s->kbd_buf_end_offset = x + sizeof(bda_s->kbd_buf);
+
 }
 
 void x86_init(void) {
@@ -119,44 +128,4 @@ void x86_init(void) {
     ints();
     irqs();
     post();
-}
-
-void x86_add_char_to_BDA(u8 scan, u8 ascii) {
-    // Получаем указатель на BDA (Base Data Area) для чтения данных клавиатуры
-    const u8* BDA = X86_FAR_PTR(0x0040, 0x0000);
-    u16* BDA16 = (u16*)(BDA + 0x1A);
-    const u16 tail = BDA16[1] % 16; // Хвост указателя записи клавиатурного буфера (0x041C)
-    // Буфер клавиш начинается с 0x041E, он имеет 16 слов (32 байта)
-    u16* buffer = (u16*)(BDA + 0x1E);
-    buffer[tail] = ((u16)scan << 8) | ascii;
-    static int i = 0;
-    goutf(30-1, false, "W %02X[%c]/%02X (%d)", ascii, ascii, scan, i++);
-    BDA16[1] = tail + 1;
-}
-
-/**
- *  17h	BYTE	Keyboard status flags 1:
-		    bit 7 =1 INSert active
-		    bit 6 =1 Caps Lock active
-		    bit 5 =1 Num Lock active
-		    bit 4 =1 Scroll Lock active
-		    bit 3 =1 either Alt pressed
-		    bit 2 =1 either Ctrl pressed
-		    bit 1 =1 Left Shift pressed
-		    bit 0 =1 Right Shift pressed
- 18h	BYTE	Keyboard status flags 2:
-		    bit 7 =1 INSert pressed
-		    bit 6 =1 Caps Lock pressed
-		    bit 5 =1 Num Lock pressed
-		    bit 4 =1 Scroll Lock pressed
-		    bit 3 =1 Pause state active
-		    bit 2 =1 Sys Req pressed
-		    bit 1 =1 Left Alt pressed
-		    bit 0 =1 Left Ctrl pressed
- */
-void x86_update_kbd_BDA(u8 keyboard_status, u8 extended_status) {
-    u8* BDA = X86_FAR_PTR(0x0040, 0x0000);
-    // Сохранение статуса в BDA
-    BDA[0x17] = keyboard_status;  // Сохраняем статус клавиатуры в BDA
-    BDA[0x18] = extended_status;  // Сохраняем расширенный статус в BDA
 }

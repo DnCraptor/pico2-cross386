@@ -436,7 +436,7 @@ static void update_keyboard_status(hid_keyboard_report_t const *report) {
     if (report->modifier & 0x04) {
         extended_status |= 0x04;  // Устанавливаем Scroll Lock активен
     }
-    x86_update_kbd_BDA(keyboard_status, extended_status);
+ ///   x86_update_kbd_BDA(keyboard_status, extended_status);
 }
 
 inline static bool isInReport(hid_keyboard_report_t const *report, const unsigned char keycode) {
@@ -652,7 +652,7 @@ void __not_in_flash_func(process_kbd_usb_report)(
 
         if (scan != 0) {
             // Добавляем в буфер
-            x86_add_char_to_BDA(scan, ascii);  // Функция для добавления в буфер
+            x86_add_char_to_BDA((scan << 8) | ascii);  // Функция для добавления в буфер
         }
     }
 }
