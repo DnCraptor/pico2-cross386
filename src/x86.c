@@ -24,6 +24,7 @@ static void ints(void) {
     X86_BASE_RAM[0x13] = (uint32_t)&x86_int13_hanler;
     X86_BASE_RAM[0x15] = (uint32_t)&x86_int15_hanler;
     X86_BASE_RAM[0x16] = (uint32_t)&x86_int16_hanler;
+    X86_BASE_RAM[0x21] = (uint32_t)&x86_int21_hanler;
 }
 
 /**

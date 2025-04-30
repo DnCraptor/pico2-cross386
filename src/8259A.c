@@ -70,16 +70,6 @@ static u8 slave_icw3 = 0;
 #define OCW2_SL           0x40
 #define OCW2_IRQ          0x07
 
-extern void __time_critical_func() x86_raise_interrupt(u8 vector) {
-    if (vector == 0x21) {
-      // temp stub (just for keyboard IRQ1)
-      goutf(30-1, false, "W %02X", X86_PORTS[0x60]);
-      X86_PORTS[0x62] &= ~2;
-    } else {
-      goutf(30-1, false, "INT %02X", vector);
-    }
-}
-
 static void __time_critical_func() x86_8259A_poll(void) {
     // Проверка IRR -> ISR и генерация INT
     for (int i = 0; i < 8; i++) {
@@ -87,20 +77,21 @@ static void __time_critical_func() x86_8259A_poll(void) {
             if (!(master_mask & (1 << i))) {
                 master_irr &= ~(1 << i);
                 master_isr |= (1 << i);
-
                 if (i == (master_icw3 & 0x07)) { // Cascade to slave
                     for (int j = 0; j < 8; j++) {
                         if (slave_irr & (1 << j)) {
                             if (!(slave_mask & (1 << j))) {
                                 slave_irr &= ~(1 << j);
                                 slave_isr |= (1 << j);
-                                x86_raise_interrupt(slave_vector_offset + j);
+                                u32 v4 = (uint32_t)X86_FAR_PTR(0, (slave_vector_offset + i) << 2);
+                                x86_raise_interrupt_wrapper(v4);
                                 return;
                             }
                         }
                     }
                 } else {
-                    x86_raise_interrupt(master_vector_offset + i);
+                    u32 v4 = (uint32_t)X86_FAR_PTR(0, (master_vector_offset + i) << 2);
+                    x86_raise_interrupt_wrapper(v4);
                     return;
                 }
             }

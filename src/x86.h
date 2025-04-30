@@ -39,9 +39,8 @@ extern u16 X86_GS;
 extern u16 X86_SS;
 extern u32 X86_CR0;
 
-static const u32 X86_RAM_BASE = 0x11000000;
-
-inline static u8* X86_FAR_PTR(uint16_t S, uint16_t X) { return (u8*)(X86_RAM_BASE + X + ((u32)S << 4)); }
+#define X86_RAM_BASE 0x11000000
+#define X86_FAR_PTR(S, X) (u8*)(X86_RAM_BASE + (X) + ((u32)S << 4))
 
 #define CONFIG_CDROM_EMU 0
 
@@ -109,6 +108,14 @@ __attribute__((naked)) void x86_int12_hanler();
 __attribute__((naked)) void x86_int13_hanler();
 __attribute__((naked)) void x86_int15_hanler();
 __attribute__((naked)) void x86_int16_hanler();
+__attribute__((naked)) void x86_int21_hanler();
+
+// to call from gcc
+uint32_t x86_int10_wrapper(uint32_t eax, uint32_t ebx, uint32_t ecx, uint32_t edx) __attribute__((pcs("aapcs")));
+uint32_t x86_int13_wrapper(uint32_t eax, uint32_t ebx, uint32_t ecx, uint32_t edx) __attribute__((pcs("aapcs")));
+uint32_t x86_int16_wrapper(uint32_t eax, uint32_t ebx, uint32_t ecx, uint32_t edx) __attribute__((pcs("aapcs")));
+uint32_t x86_int16_wrapper(uint32_t eax, uint32_t ebx, uint32_t ecx, uint32_t edx) __attribute__((pcs("aapcs")));
+uint32_t x86_raise_interrupt_wrapper(uint32_t eax) __attribute__((pcs("aapcs")));
 
 // x86 BIOS implementation
 u32 x86_int10_hanler_C(u32 eax, u32 ebx, u32 ecx, u32 edx) __attribute__((pcs("aapcs")));

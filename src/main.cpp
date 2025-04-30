@@ -869,10 +869,6 @@ e0:
     return res;
 }
 
-extern "C" uint32_t x86_int10_wrapper(uint32_t eax, uint32_t ebx, uint32_t ecx, uint32_t edx) __attribute__((pcs("aapcs")));
-extern "C" uint32_t x86_int13_wrapper(uint32_t eax, uint32_t ebx, uint32_t ecx, uint32_t edx) __attribute__((pcs("aapcs")));
-extern "C" uint32_t x86_int16_wrapper(uint32_t eax, uint32_t ebx, uint32_t ecx, uint32_t edx) __attribute__((pcs("aapcs")));
-
 static void format_hdd_test(int y) {
     u32 total_tracks = 512;          // Максимальное количество дорожек
     u32 heads = 256;                 // Максимальное количество головок
