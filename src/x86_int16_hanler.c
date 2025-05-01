@@ -12,23 +12,7 @@
  * Notes: On extended keyboards, this function discards any extended keystrokes, returning only when a non-extended keystroke is available. The BIOS scan code is usually, but not always, the same as the hardware scan code processed by INT 09. It is the same for ASCII keystrokes and most unshifted special keys (F-keys, arrow keys, etc.), but differs for shifted special keys. Some (older) clone BIOSes do not discard extended keystrokes and manage function AH=00h and AH=10h the same. The K3PLUS v6.00+ INT 16 BIOS replacement doesn't discard extended keystrokes (same as with functions 10h and 20h), but will always translate prefix E0h to 00h. This allows old programs to use extended keystrokes and should not cause compatibility problems
  */
 inline static u32 x86_int16_00() {
-    // Получаем указатель на BDA (Base Data Area) для чтения данных клавиатуры
-    const u8* BDA = X86_FAR_PTR(0x0040, 0x0000);
-    volatile u16* BDA16 = (u16*)(BDA + 0x1A);
-    const u16 head = BDA16[0] % 16; // Голова указателя чтения клавиатурного буфера (0x041A)
-    volatile u16 tail;
-    do {
-        tail = BDA16[1] % 16; // Хвост указателя записи клавиатурного буфера (0x041C)
-    } while (head == tail);
-
-    // Буфер клавиш начинается с 0x041E, он имеет 16 слов (32 байта)
-    const u16* buffer = (u16*)(BDA + 0x1E);
-    const u16 keydata = buffer[head];
-    // Получаем ASCII-код (AL) и scan-код (AH)
-    u8 ascii = (u8)keydata;
-    u8 scan = (u8)(keydata >> 8);
-    BDA16[0] = head + 1;
-    return keydata;
+    return x86_dequeue_key(1, 0);
 }
 
 /**
@@ -44,16 +28,7 @@ inline static u32 x86_int16_00() {
  * Note: If a keystroke is present, it is not removed from the keyboard buffer; however, any extended keystrokes which are not compatible with 83/84- key keyboards are removed by IBM and most fully-compatible BIOSes in the process of checking whether a non-extended keystroke is available. Some (older) clone BIOSes do not discard extended keystrokes and manage function AH=00h and AH=10h the same. The K3PLUS v6.00+ INT 16 BIOS replacement doesn't discard extended keystrokes (same as with functions 10h and 20h), but will always translate prefix E0h to 00h. This allows old programs to use extended keystrokes and should not cause compatibility problems
  */
 inline static u32 x86_int16_01() {
-    const u8* BDA = X86_FAR_PTR(0x0040, 0x0000);
-    const u16* BDA16 = (u16*)(BDA + 0x1A);
-    if ((BDA16[0] % 16) == (BDA16[1] % 16)) {
-        return ZF_ON;
-    }
-    // Буфер клавиш начинается с 0x041E, он имеет 16 слов (32 байта)
-    const u16* buffer = (u16*)(BDA + 0x1E);
-    const u16 head = BDA16[0] % 16; // Голова указателя чтения клавиатурного буфера (0x041A)
-    const u16 keydata = buffer[head];
-    return keydata;
+    return x86_dequeue_key(0, 0);
 }
 
 /**
@@ -79,8 +54,8 @@ Bit(s)  Description     (Table 00582)
 See Also: #00587 - #03743 - MEM 0040h:0017h - #M0010
  */
 inline static u32 x86_int16_02() {
-    const u8* BDA = X86_FAR_PTR(0x0040, 0x0000);
-    return BDA[0x17];
+    struct bios_data_area_s* BDA = (struct bios_data_area_s*)X86_FAR_PTR(0x0040, 0x0000);
+    return BDA->kbd_flag0;
 }
 
 u32 x86_int16_hanler_C(u32 eax, u32 ebx, u32 ecx, u32 edx) {

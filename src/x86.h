@@ -114,15 +114,14 @@ __attribute__((naked)) void x86_int21_hanler();
 uint32_t x86_int10_wrapper(uint32_t eax, uint32_t ebx, uint32_t ecx, uint32_t edx) __attribute__((pcs("aapcs")));
 uint32_t x86_int13_wrapper(uint32_t eax, uint32_t ebx, uint32_t ecx, uint32_t edx) __attribute__((pcs("aapcs")));
 uint32_t x86_int16_wrapper(uint32_t eax, uint32_t ebx, uint32_t ecx, uint32_t edx) __attribute__((pcs("aapcs")));
-uint32_t x86_int16_wrapper(uint32_t eax, uint32_t ebx, uint32_t ecx, uint32_t edx) __attribute__((pcs("aapcs")));
 uint32_t x86_raise_interrupt_wrapper(uint32_t eax) __attribute__((pcs("aapcs")));
 
 // x86 BIOS implementation
 u32 x86_int10_hanler_C(u32 eax, u32 ebx, u32 ecx, u32 edx) __attribute__((pcs("aapcs")));
 u32 x86_int13_hanler_C(u32 eax, u32 ebx, u32 ecx, u32 edx) __attribute__((pcs("aapcs")));
 
-void x86_add_char_to_BDA(u16 keycode);
-
+void x86_bios_process_key(u8 scancode);
+u32 x86_dequeue_key(int incr, int extended);
 
 #define KF1_LAST_E1    (1<<0)
 #define KF1_LAST_E0    (1<<1)
@@ -216,6 +215,8 @@ struct __attribute__((packed)) bios_data_area_s {
     // 40:B0
     u8 other_b0[5*16];
 };
+
+extern volatile struct bios_data_area_s* BDA;
 
 #ifdef __cplusplus
 }

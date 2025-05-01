@@ -455,7 +455,7 @@ void __not_in_flash_func(process_kbd_usb_report)(
     // Модификаторы
     uint8_t modifier = report->modifier;  // Сохраняем текущие модификаторы (например, SHIFT, CTRL)
     bool numLock = modifier & 0x10;  // Чтение состояния NumLock, предполагается, что это 0x10
-    update_keyboard_status(report);
+///    update_keyboard_status(report);
 
     // Обрабатываем каждый ключ в массиве keycode
     for (int i = 0; i < 6; i++) {
@@ -469,190 +469,9 @@ void __not_in_flash_func(process_kbd_usb_report)(
 
         // Преобразуем нажатую клавишу в соответствующие значения scan и ascii
         uint8_t scan = convert_keycode_to_scan(keycode);
-        uint8_t ascii = 0;  // Будем вычислять ASCII значение в зависимости от модификаторов
-
-        // Для примера простая обработка с добавлением SHIFT для букв
-        if (modifier & 0x02) {  // Проверка, нажат ли SHIFT
-            if (keycode >= HID_KEY_A && keycode <= HID_KEY_Z) {
-                // Преобразуем в заглавную букву
-                ascii = 'A' + (keycode - HID_KEY_A);
-            }
-        } else {
-            if (keycode >= HID_KEY_A && keycode <= HID_KEY_Z) {
-                // Преобразуем в строчную букву
-                ascii = 'a' + (keycode - HID_KEY_A);
-            } else if (keycode >= HID_KEY_1 && keycode <= HID_KEY_0) {
-                // Преобразуем числа
-                ascii = '1' + (keycode - HID_KEY_1);
-            } else { // Можно добавить другие клавиши
-                    switch (keycode) {
-                        case HID_KEY_TAB:
-                            ascii = '\t';  // Обрабатываем TAB
-                            break;
-                        case HID_KEY_MINUS:
-                            ascii = '-';  // Обрабатываем минус
-                            break;
-                        case HID_KEY_EQUAL:
-                            ascii = '=';  // Обрабатываем знак равно
-                            break;
-                        case HID_KEY_BRACKET_LEFT:
-                            ascii = '[';  // Обрабатываем открывающую квадратную скобку
-                            break;
-                        case HID_KEY_BRACKET_RIGHT:
-                            ascii = ']';  // Обрабатываем закрывающую квадратную скобку
-                            break;
-                        case HID_KEY_BACKSLASH:
-                            ascii = '\\';  // Обрабатываем обратный слэш
-                            break;
-                        case HID_KEY_SEMICOLON:
-                            ascii = ';';  // Обрабатываем точку с запятой
-                            break;
-                        case HID_KEY_APOSTROPHE:
-                            ascii = '\'';  // Обрабатываем апостроф
-                            break;
-                        case HID_KEY_GRAVE:
-                            ascii = '`';  // Обрабатываем обратную кавычку
-                            break;
-                        case HID_KEY_COMMA:
-                            ascii = ',';  // Обрабатываем запятую
-                            break;
-                        case HID_KEY_PERIOD:
-                            ascii = '.';  // Обрабатываем точку
-                            break;
-                        case HID_KEY_SLASH:
-                            ascii = '/';  // Обрабатываем косую черту
-                            break;
-                        case HID_KEY_CAPS_LOCK:
-                            // Модификатор Caps Lock может быть обработан отдельно (если нужно)
-                            break;
-                        case HID_KEY_F1:
-                        case HID_KEY_F2:
-                        case HID_KEY_F3:
-                        case HID_KEY_F4:
-                        case HID_KEY_F5:
-                        case HID_KEY_F6:
-                        case HID_KEY_F7:
-                        case HID_KEY_F8:
-                        case HID_KEY_F9:
-                        case HID_KEY_F10:
-                        case HID_KEY_F11:
-                        case HID_KEY_F12:
-                            // Эти клавиши не имеют ASCII кодов, так как они предназначены для функциональных действий
-                            // Пример: можно обработать их как специальные команды
-                            // Например, просто использовать специальные флаги, либо отправить в буфер что-то вроде "F1", "F2"
-                            // В вашем случае их можно игнорировать в контексте ASCII, или установить какие-то флаги
-                            ascii = 0;  // Не будем использовать их как ASCII символы, так как это не применимо.
-                            break;
-                        case HID_KEY_PRINT_SCREEN:
-                            // Пример: Print Screen клавиша
-                            ascii = 0;
-                            break;
-                        case HID_KEY_SCROLL_LOCK:
-                            // Пример: Scroll Lock клавиша
-                            ascii = 0;
-                            break;
-                        case HID_KEY_PAUSE:
-                            // Пример: Pause клавиша
-                            ascii = 0;
-                            break;
-                        case HID_KEY_RETURN:
-                            ascii = 0x0D;
-                            break;
-                        case HID_KEY_INSERT:
-                            // Пример: Insert клавиша
-                            ascii = 0;
-                            break;
-                        case HID_KEY_HOME:
-                            // Пример: Home клавиша
-                            ascii = 0;
-                            break;
-                        case HID_KEY_PAGE_UP:
-                            // Пример: Page Up клавиша
-                            ascii = 0;
-                            break;
-                        case HID_KEY_DELETE:
-                            // Пример: Delete клавиша
-                            ascii = 0;
-                            break;
-                        case HID_KEY_END:
-                            // Пример: End клавиша
-                            ascii = 0;
-                            break;
-                        case HID_KEY_PAGE_DOWN:
-                            // Пример: Page Down клавиша
-                            ascii = 0;
-                            break;
-                        case HID_KEY_ARROW_RIGHT:
-                            // Пример: Right Arrow клавиша
-                            ascii = 0;
-                            break;
-                        case HID_KEY_ARROW_LEFT:
-                            // Пример: Left Arrow клавиша
-                            ascii = 0;
-                            break;
-                        case HID_KEY_ARROW_DOWN:
-                            // Пример: Down Arrow клавиша
-                            ascii = 0;
-                            break;
-                        case HID_KEY_ARROW_UP:
-                            // Пример: Up Arrow клавиша
-                            ascii = 0;
-                            break;
-                        case HID_KEY_NUM_LOCK:
-                            // Пример: Num Lock клавиша
-                            ascii = 0;
-                            break;
-                        case HID_KEY_KEYPAD_DIVIDE:
-                            if (numLock) {
-                                ascii = '/';  // Обрабатываем клавишу деления
-                            } else {
-                                ascii = 0;
-                            }
-                            break;
-                        case HID_KEY_KEYPAD_MULTIPLY:
-                            ascii = numLock ? '*' : 0;
-                            break;
-                        case HID_KEY_KEYPAD_SUBTRACT:
-                            ascii = numLock ? '-' : 0;
-                            break;
-                        case HID_KEY_KEYPAD_ADD:
-                            ascii = numLock ? '+' : 0;
-                            break;
-                        case HID_KEY_KEYPAD_ENTER:
-                            ascii = 0x0D;
-                            break;
-                        case HID_KEY_KEYPAD_1:
-                        case HID_KEY_KEYPAD_2:
-                        case HID_KEY_KEYPAD_3:
-                        case HID_KEY_KEYPAD_4:
-                        case HID_KEY_KEYPAD_5:
-                        case HID_KEY_KEYPAD_6:
-                        case HID_KEY_KEYPAD_7:
-                        case HID_KEY_KEYPAD_8:
-                        case HID_KEY_KEYPAD_9:
-                        case HID_KEY_KEYPAD_0:
-                            if (numLock) {
-                                ascii = '0' + (keycode - HID_KEY_KEYPAD_0);  // Обрабатываем цифры на цифровой клавиатуре
-                            } else {
-                                ascii = 0;
-                            }
-                            break;
-                        case HID_KEY_KEYPAD_DECIMAL:
-                            ascii = numLock ? '.' : 0;
-                            break;
-                        case HID_KEY_KEYPAD_EQUAL:
-                            ascii = numLock ? '=' : 0;
-                            break;
-                        default:
-                            ascii = 0;  // Для всех остальных клавиш
-                            break;
-                    }
-            }
-        }
-
         if (scan != 0) {
             // Добавляем в буфер
-            x86_add_char_to_BDA((scan << 8) | ascii);  // Функция для добавления в буфер
+            x86_bios_process_key(scan);  // Функция для добавления в буфер
         }
     }
 }
@@ -1242,7 +1061,7 @@ int main() {
         static int i = 0;
         u8 ascii = (u8)eax;
         u8 scan = (u8)(eax >> 8);
-        goutf(30-3, false, "R %02X[%c]/%02X (%d)", ascii, ascii, scan, i++);
+        goutf(30-3, false, "R %02X[%c]/%02X (%d)", ascii, ascii ? ascii : '0', scan, i++);
     }
 
     __unreachable();
