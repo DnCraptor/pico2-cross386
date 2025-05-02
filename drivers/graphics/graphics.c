@@ -84,7 +84,7 @@ void draw_text(const char* string, uint32_t x, uint32_t y, uint8_t color, uint8_
     for (int xi = current_video_mode_width * 2; xi--;) {
         if (!*string) break;
         *t_buf++ = *string++;
-        *t_buf++ = bgcolor << 4 | color & 0xF;
+        *t_buf++ = (bgcolor << 4) | (color & 0xF);
     }
 }
 
@@ -93,7 +93,7 @@ void draw_debug_text(const char* string, uint32_t x, uint32_t y, uint8_t color, 
     uint8_t* t_buf = (uint8_t*)SCREEN + w * 2 * y + 2 * x;
     for (int xi = w * 2; xi--; ) {
         *t_buf++ = *string ? *string++ : ' ';
-        *t_buf++ = bgcolor << 4 | color & 0xF;
+        *t_buf++ = (bgcolor << 4) | (color & 0xF);
     }
 }
 
@@ -126,11 +126,14 @@ void draw_window(const char* title, uint32_t x, uint32_t y, uint32_t width, uint
     draw_text(line, x + (width - strlen(line)) / 2, y, 14, 3);
 }
 
-void clrScr(const uint8_t bgColor) {
+void clrScr(const uint8_t fgColor, const uint8_t bgColor) {
     uint16_t* t_buf = (uint16_t*)VGA_FRAMBUFFER_WINDOW_START;
     t_buf += text_page * VGA_FRAMBUFFER_WINDOW_SIZE;
     int size = current_video_mode_width * current_video_mode_height;
-    while (size--) *t_buf++ = (bgColor << 4) | ' ';
+    uint16_t c = (bgColor << 4) | (fgColor & 0x0F);
+    while (size--) {
+        *t_buf++ = (c << 8) | ' ';
+    }
 }
 
 void clrBuf(void) {

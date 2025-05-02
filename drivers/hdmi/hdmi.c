@@ -545,7 +545,7 @@ static inline bool hdmi_init() {
 //выбор видеорежима
 inline void graphics_set_mode_hdmi(enum graphics_mode_t mode) {
     graphics_mode = mode;
-    clrScr(0);
+    clrScr(7, 0);
 };
 
 void graphics_set_palette_hdmi(uint8_t i, uint32_t color888) {

@@ -102,7 +102,7 @@ e:
     BDA16[1] = 0xB800; // 0x0467	2 байта	Начальный адрес видеобуфера для скроллинга
     BDA16[2] = current_video_mode_height - 1; // 0x0469	2 байта	Количество строк на экране (минус 1)
     BDA16[3] = current_video_mode_width * 2; // 0x046B	2 байта	Количество байт на строку
-    clrScr(0);
+    clrScr(7, 0);
     return 0x30;
 }
 
@@ -493,11 +493,13 @@ inline static u32 x86_int10_hanler_0E(u32 eax, u32 ebx) {
 
     // Записать символ
     u16 c = (*b16 & 0xFF00) | AL;  // сохранить атрибут, заменить символ
+    if (AL == 0x0D) goto nextLine;
     *b16 = c;
 
     // Переместить курсор вправо
     ++column;
     if (column >= width) {
+nextLine:
         column = 0;
         ++row;
         if (row >= height) {
@@ -511,7 +513,6 @@ inline static u32 x86_int10_hanler_0E(u32 eax, u32 ebx) {
             for (u16 i = 0; i < width; ++i) {
                 last_line[i] = blank;
             }
-            --row;
         }
     }
 

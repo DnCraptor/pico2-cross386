@@ -558,7 +558,7 @@ void __time_critical_func(render_core)() {
     graphics_set_offset(0, 0);
     graphics_set_flashmode(false, false);
     graphics_set_mode(TEXTMODE_DEFAULT);
-    clrScr(0);
+    clrScr(7, 0);
     sem_acquire_blocking(&vga_start_semaphore);
     // 60 FPS loop
 #define frame_tick (16666)

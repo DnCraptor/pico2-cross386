@@ -254,7 +254,7 @@ u32 x86_dequeue_key(int incr, int extended)
     if (buffer_head >= buffer_end)
         buffer_head = buffer_start;
     BDA->kbd_buf_head = buffer_head;
-    goutf(30-3, false, "int 16h 00h keycode: %Xh", keycode);
+    ///goutf(30-3, false, "int 16h 00h keycode: %Xh", keycode);
     return keycode;
 }
 
