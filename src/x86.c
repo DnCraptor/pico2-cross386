@@ -18,13 +18,13 @@ static void ints(void) {
         X86_BASE_RAM[i] = (uint32_t)&x86_iret;
     }
     // TODO:
+    X86_BASE_RAM[0x09] = (uint32_t)&x86_int09_hanler;
     X86_BASE_RAM[0x10] = (uint32_t)&x86_int10_hanler;
     X86_BASE_RAM[0x11] = (uint32_t)&x86_int11_hanler;
     X86_BASE_RAM[0x12] = (uint32_t)&x86_int12_hanler;
     X86_BASE_RAM[0x13] = (uint32_t)&x86_int13_hanler;
     X86_BASE_RAM[0x15] = (uint32_t)&x86_int15_hanler;
     X86_BASE_RAM[0x16] = (uint32_t)&x86_int16_hanler;
-    X86_BASE_RAM[0x21] = (uint32_t)&x86_int21_hanler;
 }
 
 /**
@@ -36,14 +36,14 @@ static void ints(void) {
 static void irqs(void) {
     // Master PIC
     x86_port_hanle8_C(0x20, 0x11); // ICW1: Начинаем инициализацию, ожидаем ICW4
-// XT case    x86_port_hanle8_C(0x21, 0x08); // ICW2: Базовый вектор прерываний 08h
-    x86_port_hanle8_C(0x21, 0x20); // ICW2: Базовый вектор прерываний 20h
+    x86_port_hanle8_C(0x21, 0x08); // ICW2: Базовый вектор прерываний 08h
+//    x86_port_hanle8_C(0x21, 0x20); // ICW2: Базовый вектор прерываний 20h
     x86_port_hanle8_C(0x21, 0x04); // ICW3: Подчиненный контроллер на IRQ2
     x86_port_hanle8_C(0x21, 0x01); // ICW4: Режим 8086/88
     // Slave PIC
     x86_port_hanle8_C(0xA0, 0x11); // ICW1: Начинаем инициализацию, ожидаем ICW4
-// XT case    x86_port_hanle8_C(0xA1, 0x08); // ICW2: Базовый вектор прерываний 08h
-    x86_port_hanle8_C(0xA1, 0x28); // ICW2: Базовый вектор прерываний 28h
+    x86_port_hanle8_C(0xA1, 0x08); // ICW2: Базовый вектор прерываний 08h
+//    x86_port_hanle8_C(0xA1, 0x28); // ICW2: Базовый вектор прерываний 28h
     x86_port_hanle8_C(0xA1, 0x02); // ICW3: Подключен к IRQ2 на master (bit 2)
     x86_port_hanle8_C(0xA1, 0x01); // ICW4: Режим 8086/88
 

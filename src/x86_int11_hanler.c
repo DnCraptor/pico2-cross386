@@ -10,6 +10,5 @@
  * See Also: INT 4B"Tandy 2000" - MEM 0040h:0010h
  */
 u32 x86_int11_hanler_C() {
-    u16* BDA = (u16*)X86_FAR_PTR(0x0040, 0x0010);
-    return *BDA;
+    return BDA->equipment_list_flags;
 }

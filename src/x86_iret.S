@@ -5,7 +5,7 @@
 .type x86_iret, %function
 
 x86_iret:
-    POP   {r0, lr}             // r0 ← сохранённые флаги, LR ← адрес возврата
-    MSR   APSR_nzcvq, r0       // восстановление флагов NZCVQ
+    POP   {r0, r1}             // r1 ← сохранённые флаги, r0 ← адрес возврата
+    MSR   APSR_nzcvq, r1       // восстановление флагов NZCVQ
     CPSIE i                    // разрешение прерываний (IF=1)
-    BX    lr                   // возврат
+    MOV   pc, r0               // возврат

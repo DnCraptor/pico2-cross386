@@ -254,6 +254,7 @@ u32 x86_dequeue_key(int incr, int extended)
     if (buffer_head >= buffer_end)
         buffer_head = buffer_start;
     BDA->kbd_buf_head = buffer_head;
+    goutf(30-3, false, "int 16h 00h keycode: %Xh", keycode);
     return keycode;
 }
 
@@ -388,7 +389,7 @@ void x86_bios_process_key(u8 scancode)
         // ignore key releases
         return;
     if (!scancode || scancode >= sizeof(scan_to_keycode) / sizeof(struct scaninfo)) {
-        goutf(30-1, true, "x86_bios_process_key unknown scancode: 0x%X", scancode);
+      //  goutf(30-1, true, "x86_bios_process_key unknown scancode: 0x%X", scancode);
         return;
     }
     struct scaninfo *info = &scan_to_keycode[scancode];

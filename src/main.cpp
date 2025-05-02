@@ -1057,11 +1057,12 @@ int main() {
 
     u32 i = 0;
     while(1) {
-        eax = x86_int16_wrapper(0, 0, 0, 0);
-        static int i = 0;
-        u8 ascii = (u8)eax;
-        u8 scan = (u8)(eax >> 8);
-        goutf(30-3, false, "R %02X[%c]/%02X (%d)", ascii, ascii ? ascii : '0', scan, i++);
+        x86_translate_test();
+//        eax = x86_int16_wrapper(0, 0, 0, 0);
+  //      static int i = 0;
+    //    u8 ascii = (u8)eax;
+      //  u8 scan = (u8)(eax >> 8);
+        //goutf(30-3, false, "R %02X[%c]/%02X (%d)", ascii, ascii ? ascii : '0', scan, i++);
     }
 
     __unreachable();

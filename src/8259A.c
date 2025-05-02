@@ -83,14 +83,14 @@ static void __time_critical_func() x86_8259A_poll(void) {
                             if (!(slave_mask & (1 << j))) {
                                 slave_irr &= ~(1 << j);
                                 slave_isr |= (1 << j);
-                                u32 v4 = (uint32_t)X86_FAR_PTR(0, (slave_vector_offset + i) << 2);
+                                u32 v4 = X86_RAM_BASE + (slave_vector_offset + i) * 4;
                                 x86_raise_interrupt_wrapper(v4);
                                 return;
                             }
                         }
                     }
                 } else {
-                    u32 v4 = (uint32_t)X86_FAR_PTR(0, (master_vector_offset + i) << 2);
+                    u32 v4 = X86_RAM_BASE + (master_vector_offset + i) * 4;
                     x86_raise_interrupt_wrapper(v4);
                     return;
                 }
