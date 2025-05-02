@@ -234,19 +234,28 @@ static void __scratch_y("hdmi_driver") dma_handler_HDMI() {
             case TEXTMODE_53x30: {
                 int y = line / 2;
                 *output_buffer++ = 255;
-
+                int CURSOR_X = cursor_blink_state ? -1 : text_cursor_column + 6;
+                int CURSOR_Y = text_cursor_row + 2; // modes 0 and 3
+                int yc = y >> 3;    // y / 8;
+                int y8 = y & 0b111; // y % 8;
                 for (int x = 0; x < TEXTMODE_COLS; x++) {
-                    const uint16_t offset = (y / 8) * (TEXTMODE_COLS * 2) + x * 2;
+                    const uint16_t offset = yc * (TEXTMODE_COLS * 2) + x * 2;
                     const uint8_t c = text_buffer[offset];
                     const uint8_t colorIndex = text_buffer[offset + 1];
-                    uint8_t glyph_row = font_6x8[c * 8 + y % 8];
-
-                    for (int bit = 6; bit--;) {
-                        *output_buffer++ = glyph_row & 1
-                                               ? textmode_palette[colorIndex & 0xf] //цвет шрифта
-                                               : textmode_palette[colorIndex >> 4]; //цвет фона
-
-                        glyph_row >>= 1;
+                    uint8_t glyph_row = font_6x8[c * 8 + y8];
+                    if (CURSOR_Y == yc && y8 == 7 && CURSOR_X == x) {
+                        uint8_t ci = textmode_palette[7];
+                        for (int bit = 6; bit--;) {
+                            *output_buffer++ = ci;
+                            glyph_row >>= 1;
+                        }
+                    } else {
+                        for (int bit = 6; bit--;) {
+                            *output_buffer++ = glyph_row & 1
+                                                   ? textmode_palette[colorIndex & 0xf] //цвет шрифта
+                                                   : textmode_palette[colorIndex >> 4]; //цвет фона
+                            glyph_row >>= 1;
+                        }
                     }
                 }
                 *output_buffer = 255;

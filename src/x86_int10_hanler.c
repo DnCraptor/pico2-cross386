@@ -141,8 +141,8 @@ inline static u32 x86_int10_hanler_02(u32 ebx, u32 edx) {
     if (BH > 7) return 0;
     u16* BDA = (u16*)X86_FAR_PTR(0x0040, 0x0050);
     BDA[BH] = (u16)edx;
-    // TODO: uint8_t text_cursor_row = 0;
-//uint8_t text_cursor_column = 0;
+    text_cursor_row = DH;
+    text_cursor_column = DL;
     return 0;
 }
 
@@ -405,6 +405,8 @@ inline static u32 x86_int10_hanler_09(u32 eax, u32 ebx, u32 ecx) {
         }
     }
     BDA[BH] = (row << 8) | column;
+    text_cursor_row = row;
+    text_cursor_column = column;
     return 0;
 }
 
@@ -444,6 +446,8 @@ inline static u32 x86_int10_hanler_0A(u32 eax, u32 ebx, u32 ecx) {
         }
     }
     BDA[BH] = (row << 8) | column;
+    text_cursor_row = row;
+    text_cursor_column = column;
     return 0;
 }
 
@@ -518,6 +522,8 @@ nextLine:
 
     // Сохранить новую позицию курсора
     BDA[BH] = (row << 8) | column;
+    text_cursor_row = row;
+    text_cursor_column = column;
     return 0;
 }
 

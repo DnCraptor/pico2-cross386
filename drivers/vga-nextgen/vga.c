@@ -137,14 +137,15 @@ void __time_critical_func() dma_handler_VGA() {
             //указатель откуда начать считывать символы
             uint8_t* text_buffer_line = &text_buffer[screen_line / font_height * text_buffer_width * 2];
 
+            int CURSOR_X = cursor_blink_state ? -1 : text_cursor_column;
+            int CURSOR_Y = text_cursor_row + 2; // modes 0 and 3
+            // TODO: cursor style
             for (int x = 0; x < text_buffer_width; x++) {
                 //из таблицы символов получаем "срез" текущего символа
                 uint8_t glyph_pixels = font_8x16[*text_buffer_line++ * font_height + glyph_line];
                 //считываем из быстрой палитры начало таблицы быстрого преобразования 2-битных комбинаций цветов пикселей
                 uint16_t* color = &txt_palette_fast[*text_buffer_line++ * 4];
-#if 0
-                if (cursor_blink_state && !manager_started &&
-                    (screen_line / 16 == CURSOR_Y && x == CURSOR_X && glyph_line >= 11 && glyph_line <= 13)) {
+                if ((screen_line / 16 == CURSOR_Y && x == CURSOR_X && glyph_line >= 11 && glyph_line <= 13)) {
                     *output_buffer_16bit++ = color[3];
                     *output_buffer_16bit++ = color[3];
                     *output_buffer_16bit++ = color[3];
@@ -157,7 +158,6 @@ void __time_critical_func() dma_handler_VGA() {
                     }
                 }
                 else
-#endif
                 {
                     *output_buffer_16bit++ = color[glyph_pixels & 3];
                     if (text_buffer_width == 40) *output_buffer_16bit++ = color[glyph_pixels & 3];

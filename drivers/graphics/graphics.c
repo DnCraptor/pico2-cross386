@@ -35,6 +35,7 @@ CL имеет значения от 0 до 31, так как видеоэкра�
 uint32_t text_cursor_type = 0x1018; // мигающий курсор внизу строки.
 uint8_t text_cursor_row = 0;
 uint8_t text_cursor_column = 0;
+uint8_t cursor_blink_state = 0;
 uint8_t text_page = 0;
 uint8_t border_color = 0; // background/border color (border only in text modes)
 uint8_t paletteID = 0; // valid in 320x200 graphics on the CGA, but newer cards support it in many or all graphics modes
@@ -81,11 +82,16 @@ void __time_critical_func() handle_frame_changed() {
 
 void draw_text(const char* string, uint32_t x, uint32_t y, uint8_t color, uint8_t bgcolor) {
     uint8_t* t_buf = (uint8_t*)VGA_FRAMBUFFER_WINDOW_START + current_video_mode_width * 2 * y + 2 * x;
-    for (int xi = current_video_mode_width * 2; xi--;) {
+    for (int xi = x; xi < current_video_mode_width; ++xi) {
         if (!*string) break;
         *t_buf++ = *string++;
         *t_buf++ = (bgcolor << 4) | (color & 0xF);
     }
+    u16* BDA = (u16*)X86_FAR_PTR(0x0040, 0x0050);
+    ++y;
+    BDA[text_page] = y << 8;
+    text_cursor_row = y;
+    text_cursor_column = 0;
 }
 
 void draw_debug_text(const char* string, uint32_t x, uint32_t y, uint8_t color, uint8_t bgcolor) {

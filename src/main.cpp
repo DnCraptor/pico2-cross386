@@ -563,6 +563,7 @@ void __time_critical_func(render_core)() {
     // 60 FPS loop
 #define frame_tick (16666)
     uint64_t tick = time_us_64();
+    uint64_t last_cursor_blink = tick;
     uint64_t last_frame_tick = tick;
     static uint32_t frame_no = 0;
     while (true) {
@@ -573,6 +574,10 @@ void __time_critical_func(render_core)() {
 #endif
             last_frame_tick = tick;
           //  
+        }
+        if (tick >= last_cursor_blink + 500000) {
+            cursor_blink_state ^= 1;
+            last_cursor_blink = tick;
         }
         tuh_task();
         tick = time_us_64();
