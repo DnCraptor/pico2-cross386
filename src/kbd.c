@@ -20,8 +20,6 @@
 #define KF0_CAPS         (1<<14)
 
 volatile struct bios_data_area_s* BDA = (struct bios_data_area_s*)X86_FAR_PTR(0x0040, 0x0000);
-#define GET_BDA(field) BDA->field
-#define SET_BDA(field, val) BDA->field = val
 
 static struct __attribute__((packed)) scaninfo {
     u16 normal;

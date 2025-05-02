@@ -217,6 +217,9 @@ struct __attribute__((packed)) bios_data_area_s {
 };
 
 extern volatile struct bios_data_area_s* BDA;
+#define GET_BDA(field) BDA->field
+#define SET_BDA(field, val) BDA->field = val
+u8 x86_enqueue_key(u16 keycode);
 
 #ifdef __cplusplus
 }
