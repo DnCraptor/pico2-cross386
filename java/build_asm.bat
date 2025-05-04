@@ -1,0 +1,1 @@
+nasm -f bin in.asm -o in.com
