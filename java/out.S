@@ -51,19 +51,22 @@ start_it:
     MOV  R4, #0x4C00          // B8h 00h 4Ch = MOV AX, 0x4C00
     // x86 00000027; opcode: CD; bytes: 2
     CPSID i                   // Запрет прерываний перед INT
-    adr  r11, m00000029       // CCh = int 21
+    push {lr}                 // не потерять в INT/IRET
+    adr  r11, m00000027_IRET   // CCh = int 21
     mrs  r12, apsr            // Сохраняем флаги
     push {r11, r12}           // Эмулируем PUSH IP, PUSH FLAGS
     ldr  r11, =0x11000084     // Адрес обработчика INT 21h
     ldr  r11, [r11]           // Адрес обработчика (IDT)
     mov  pc, r11              // Переход к обработчику
+m00000027_IRET:
+    pop  {lr}                 // восстановить после IRET
 m00000029:
     // x86 00000029; opcode: 31; bytes: 2
     // 01h C0h = XOR [Ew], R4
     MOV  R0, R4
     MOV  R1, R4
     MOV  R2, R0
-    XORS R3, R0, R1
+    EORS R3, R0, R1
     MOV  R4, R3
 
     // x86 0000002B; opcode: F8; bytes: 1
@@ -251,12 +254,15 @@ m00000087:
     ORR  R4, R4, R0           // объединить AL и новый AH
     // x86 00000089; opcode: CD; bytes: 2
     CPSID i                   // Запрет прерываний перед INT
-    adr  r11, m0000008B       // CCh = int 10
+    push {lr}                 // не потерять в INT/IRET
+    adr  r11, m00000089_IRET   // CCh = int 10
     mrs  r12, apsr            // Сохраняем флаги
     push {r11, r12}           // Эмулируем PUSH IP, PUSH FLAGS
     ldr  r11, =0x11000040     // Адрес обработчика INT 10h
     ldr  r11, [r11]           // Адрес обработчика (IDT)
     mov  pc, r11              // Переход к обработчику
+m00000089_IRET:
+    pop  {lr}                 // восстановить после IRET
 m0000008B:
     // x86 0000008B; opcode: C3; bytes: 1
     BX LR                // C3h = RET
@@ -279,5 +285,5 @@ m0000008C:
     pop  {LR}
     // x86 00000096; opcode: C3; bytes: 1
     BX LR                // C3h = RET
-    // x86 00000097; opcode: 90; bytes: 1
-// 00000097: 90h
+    // x86 00000029; opcode: 90; bytes: 1
+    NOP                  // 90h = NOP

@@ -66,6 +66,8 @@ public class Main {
             }
             offset = m33i.nextOffset;
         }
+        // TODO: detect it better
+        m33.add(new M33Replacement(offset, 0x90, "    NOP   // предположительно, конец программы"));
     }
 
     private static void markCFisRequired(int offset) {
@@ -151,7 +153,6 @@ public class Main {
             }
             offset += mi.bytes;
         }
-        m33.add(new M33Replacement(offset, 0x90, "    NOP"));
     }
 
     private static void readBinary(FileInputStream input) throws IOException {

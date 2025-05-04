@@ -10,6 +10,9 @@ u16 X86_FS = 0;
 u16 X86_GS = 0;
 u16 X86_SS = 0;
 u32 X86_CR0 = 0x00000010; // PE=0, ET=1
+u32 X86_PF = 0;
+u32 X86_CF = 0;
+u32 X86_AF = 0;
 
 static void ints(void) {
     // init interrupts
@@ -129,3 +132,8 @@ void x86_init(void) {
     irqs();
     post();
 }
+
+u32 x86_debug_C(u32 eax, u32 ebx, u32 ecx, u32 edx) {
+    goutf(30 - 3, false, "x86_debug_C(%08X, %08X, %08X, %08X)", eax, ebx, ecx, edx);
+    return eax;
+} 

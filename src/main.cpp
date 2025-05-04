@@ -234,7 +234,7 @@ extern "C" {
 void process_mouse_report(hid_mouse_report_t const * report)
 {
     mouse_buttons = report->buttons;
-///    goutf(current_video_mode_height - 2, false, "Mouse X: %d Y: %d Wheel: %02Xh Buttons: %02Xh         ", report->x, report->y, report->wheel, report->buttons);
+///    goutf(30 - 2, false, "Mouse X: %d Y: %d Wheel: %02Xh Buttons: %02Xh         ", report->x, report->y, report->wheel, report->buttons);
   /*
   //------------- button state  -------------//
   uint8_t button_changed_mask = report->buttons ^ prev_report.buttons;
@@ -481,7 +481,7 @@ void __not_in_flash_func(process_kbd_report)(
     hid_keyboard_report_t const *report,
     hid_keyboard_report_t const *prev_report
 ) {
-    goutf(current_video_mode_height - 3, false, "HID modifiers: %02Xh                                ", report->modifier);
+    goutf(30 - 3, false, "HID modifiers: %02Xh                                ", report->modifier);
     pressed_key[HID_KEY_ALT_LEFT] = report->modifier & KEYBOARD_MODIFIER_LEFTALT;
     pressed_key[HID_KEY_ALT_RIGHT] = report->modifier & KEYBOARD_MODIFIER_RIGHTALT;
     pressed_key[HID_KEY_CONTROL_LEFT] = report->modifier & KEYBOARD_MODIFIER_LEFTCTRL;
@@ -498,7 +498,7 @@ void __not_in_flash_func(process_kbd_report)(
         if (!key_still_pressed) {
          ///   kbd_queue_push(pressed_key[pkc], false);
             pressed_key[pkc] = 0;
-            goutf(current_video_mode_height - 3, false, "Release hid_code: %02Xh modifiers: %02Xh            ", pkc, report->modifier);
+            goutf(30 - 3, false, "Release hid_code: %02Xh modifiers: %02Xh            ", pkc, report->modifier);
         }
     }
     for (uint8_t kc: report->keycode) {
@@ -510,7 +510,7 @@ void __not_in_flash_func(process_kbd_report)(
             if (hid_code != 0) {
                 *pk = hid_code;
             ///    kbd_queue_push(hid_code, true);
-                goutf(current_video_mode_height - 3, false, "Hit hid_code: %02Xh modifiers: %02Xh             ", hid_code, report->modifier);
+                goutf(30 - 3, false, "Hit hid_code: %02Xh modifiers: %02Xh             ", hid_code, report->modifier);
             }
         }
     }

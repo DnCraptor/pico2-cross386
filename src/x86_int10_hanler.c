@@ -559,7 +559,7 @@ inline static u32 x86_int10_hanler_0F(void) {
 }
 
 u32 x86_int10_hanler_C(u32 eax, u32 ebx, u32 ecx, u32 edx) {
-   // goutf(current_video_mode_height - 1, false, "x86_int10_hanler_C(%08X, %08X, %08X, %08X)", eax, ebx, ecx, edx);
+   // goutf(30 - 1, false, "x86_int10_hanler_C(%08X, %08X, %08X, %08X)", eax, ebx, ecx, edx);
     switch (AH) { // AH - function
         case 0:
             return x86_int10_hanler_00(eax);

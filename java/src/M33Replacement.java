@@ -27,6 +27,7 @@ public class M33Replacement {
         this.offset = offset;
         this.keyByte = keyByte;
         this.m33candidate = m33candidate;
+        this.passed = true;
         this.nextOffset = -1; // ??
     }
 
@@ -1514,10 +1515,10 @@ public class M33Replacement {
                 final boolean srcHigh = isHigh[reg];
 
                 final String[] rmExprs = {
-                        "XOR  R0, R5, R8           // [BX+SI]<-",
-                        "XOR  R0, R5, R9           // [BX+DI]<-",
-                        "XOR  R0, R10, R8          // [BP+SI]<-",
-                        "XOR  R0, R10, R9          // [BP+DI]<-",
+                        "EOR  R0, R5, R8           // [BX+SI]<-",
+                        "EOR  R0, R5, R9           // [BX+DI]<-",
+                        "EOR  R0, R10, R8          // [BP+SI]<-",
+                        "EOR  R0, R10, R9          // [BP+DI]<-",
                         "MOV  R0, R8               // [SI]<-",
                         "MOV  R0, R9               // [DI]<-",
                         "MOV  R0, R10              // [BP]<-",
@@ -1540,7 +1541,7 @@ public class M33Replacement {
                                     "    UXTB R2, " + srcReg + "\n") +
                             "    MOV  R1, R2\n" +         // R1 = src
                             "    MOV  R2, R3\n" +         // R2 = dst
-                            "    XORS R3, R3, R1\n" +     // R3 = dst ^ src
+                            "    EORS R3, R3, R1\n" +     // R3 = dst ^ src
                             "    STRB R3, [R0]\n" +
                             "    MOV  R0, R2\n" +         // R0 = old dst
                             "    MOV  R2, R3\n";          // R2 = result
@@ -1548,7 +1549,7 @@ public class M33Replacement {
                 } else if (mod == 0b01) {
                     final int disp8 = bin.get(offset + 2);
                     final int disp8s = (byte) disp8;
-                    m33candidate = comment + String.format("\n%s\n    XORS R0, R0, #%d\n", rmExprs[rm], disp8s) +
+                    m33candidate = comment + String.format("\n%s\n    EORS R0, R0, #%d\n", rmExprs[rm], disp8s) +
                             "    LDR  R1, =X86_DS\n" +
                             "    LDRH R2, [R1]\n" +
                             "    LSLS R2, R2, #4\n" +
@@ -1561,7 +1562,7 @@ public class M33Replacement {
                                     "    UXTB R2, " + srcReg + "\n") +
                             "    MOV  R1, R2\n" +
                             "    MOV  R2, R3\n" +
-                            "    XORS R3, R3, R1\n" +
+                            "    EORS R3, R3, R1\n" +
                             "    STRB R3, [R0]\n" +
                             "    MOV  R0, R2\n" +
                             "    MOV  R2, R3\n";
@@ -1571,7 +1572,7 @@ public class M33Replacement {
                     final int hi = bin.get(offset + 3) & 0xFF;
                     final int disp16 = (hi << 8) | lo;
                     final int disp16s = (short) disp16;
-                    m33candidate = comment + String.format("\n%s\n    XOR  R0, R0, #%d\n", rmExprs[rm], disp16s) +
+                    m33candidate = comment + String.format("\n%s\n    EOR  R0, R0, #%d\n", rmExprs[rm], disp16s) +
                             "    LDR  R1, =X86_DS\n" +
                             "    LDRH R2, [R1]\n" +
                             "    LSLS R2, R2, #4\n" +
@@ -1584,7 +1585,7 @@ public class M33Replacement {
                                     "    UXTB R2, " + srcReg + "\n") +
                             "    MOV  R1, R2\n" +
                             "    MOV  R2, R3\n" +
-                            "    XORS R3, R3, R1\n" +
+                            "    EORS R3, R3, R1\n" +
                             "    STRB R3, [R0]\n" +
                             "    MOV  R0, R2\n" +
                             "    MOV  R2, R3\n";
@@ -1601,13 +1602,13 @@ public class M33Replacement {
                             (srcHigh ?
                                     "    LSRS R1, " + srcReg + ", #8\n" :
                                     "    UXTB R1, " + srcReg + "\n") +
-                            "    XORS R2, R0, R1\n" +
+                            "    EORS R2, R0, R1\n" +
                             (dstHigh ?
                                     "    LSL  R2, R2, #8\n" +
                                             "    BIC  " + dstReg + ", " + dstReg + ", #0xFF00\n" +
-                                            "    XOR  " + dstReg + ", " + dstReg + ", R2\n" :
+                                            "    EOR  " + dstReg + ", " + dstReg + ", R2\n" :
                                     "    BIC  " + dstReg + ", " + dstReg + ", #0xFF\n" +
-                                            "    XOR  " + dstReg + ", " + dstReg + ", R2\n");
+                                            "    EOR  " + dstReg + ", " + dstReg + ", R2\n");
                     bytes = 2;
                 }
 
@@ -1630,10 +1631,10 @@ public class M33Replacement {
                 final String srcReg = x86Reg16[reg];
 
                 final String[] rmExprs = {
-                        "XOR  R0, R5, R8           // [BX+SI]",
-                        "XOR  R0, R5, R9           // [BX+DI]",
-                        "XOR  R0, R10, R8          // [BP+SI]",
-                        "XOR  R0, R10, R9          // [BP+DI]",
+                        "EOR  R0, R5, R8           // [BX+SI]",
+                        "EOR  R0, R5, R9           // [BX+DI]",
+                        "EOR  R0, R10, R8          // [BP+SI]",
+                        "EOR  R0, R10, R9          // [BP+DI]",
                         "MOV  R0, R8               // [SI]",
                         "MOV  R0, R9               // [DI]",
                         "MOV  R0, R10              // [BP]",
@@ -1653,14 +1654,14 @@ public class M33Replacement {
                             "    LDRH R3, [R0]\n" +
                             "    MOV  R1, " + srcReg + "\n" +
                             "    MOV  R2, R3           // old value\n" +
-                            "    XORS R3, R3, R1       // result in R3, flags auto-updated\n" +
+                            "    EORS R3, R3, R1       // result in R3, flags auto-updated\n" +
                             "    STRH R3, [R0]\n";
                     bytes = 2;
                 } else if (mod == 0b01) {
                     final int disp8 = bin.get(offset + 2);
                     final int disp8s = (byte) disp8;
                     m33candidate = comment + "\n    " + rmExprs[rm] +
-                            String.format("\n    XORS R0, R0, #%d\n", disp8s) +
+                            String.format("\n    EORS R0, R0, #%d\n", disp8s) +
                             "    LDR  R1, =X86_DS\n" +
                             "    LDRH R2, [R1]\n" +
                             "    LSLS R2, R2, #4\n" +
@@ -1670,7 +1671,7 @@ public class M33Replacement {
                             "    LDRH R3, [R0]\n" +
                             "    MOV  R1, " + srcReg + "\n" +
                             "    MOV  R2, R3\n" +
-                            "    XORS R3, R3, R1\n" +
+                            "    EORS R3, R3, R1\n" +
                             "    STRH R3, [R0]\n";
                     bytes = 3;
                 } else if (mod == 0b10) {
@@ -1679,7 +1680,7 @@ public class M33Replacement {
                     final int disp16 = (hi << 8) | lo;
                     final int disp16s = (short) disp16;
                     m33candidate = comment + "\n    " + rmExprs[rm] +
-                            String.format("\n    XOR  R0, R0, #%d\n", disp16s) +
+                            String.format("\n    EOR  R0, R0, #%d\n", disp16s) +
                             "    LDR  R1, =X86_DS\n" +
                             "    LDRH R2, [R1]\n" +
                             "    LSLS R2, R2, #4\n" +
@@ -1689,7 +1690,7 @@ public class M33Replacement {
                             "    LDRH R3, [R0]\n" +
                             "    MOV  R1, " + srcReg + "\n" +
                             "    MOV  R2, R3\n" +
-                            "    XORS R3, R3, R1\n" +
+                            "    EORS R3, R3, R1\n" +
                             "    STRH R3, [R0]\n";
                     bytes = 4;
                 } else { // mod == 0b11, регистровый режим
@@ -1698,7 +1699,7 @@ public class M33Replacement {
                             "    MOV  R0, " + dstReg + "\n" +
                             "    MOV  R1, " + srcReg + "\n" +
                             "    MOV  R2, R0\n" +
-                            "    XORS R3, R0, R1\n" +
+                            "    EORS R3, R0, R1\n" +
                             "    MOV  " + dstReg + ", R3\n";
                     bytes = 2;
                 }
@@ -1722,10 +1723,10 @@ public class M33Replacement {
                 final String dstReg = x86Reg16[reg];
 
                 final String[] rmExprs = {
-                        "XOR  R0, R5, R8           // [BX+SI]",
-                        "XOR  R0, R5, R9           // [BX+DI]",
-                        "XOR  R0, R10, R8          // [BP+SI]",
-                        "XOR  R0, R10, R9          // [BP+DI]",
+                        "EOR  R0, R5, R8           // [BX+SI]",
+                        "EOR  R0, R5, R9           // [BX+DI]",
+                        "EOR  R0, R10, R8          // [BP+SI]",
+                        "EOR  R0, R10, R9          // [BP+DI]",
                         "MOV  R0, R8               // [SI]",
                         "MOV  R0, R9               // [DI]",
                         "MOV  R0, R10              // [BP]",
@@ -1745,14 +1746,14 @@ public class M33Replacement {
                             "    LDRH R3, [R0]\n" +
                             "    MOV  R1, " + dstReg + "\n" +
                             "    MOV  R2, R3           // old value\n" +
-                            "    XORS R3, R3, R1       // result in R3, flags auto-updated\n" +
+                            "    EORS R3, R3, R1       // result in R3, flags auto-updated\n" +
                             "    STRH R3, [R0]\n";
                     bytes = 2;
                 } else if (mod == 0b01) {
                     final int disp8 = bin.get(offset + 2);
                     final int disp8s = (byte) disp8;
                     m33candidate = comment + "\n    " + rmExprs[rm] +
-                            String.format("\n    XORS R0, R0, #%d\n", disp8s) +
+                            String.format("\n    EORS R0, R0, #%d\n", disp8s) +
                             "    LDR  R1, =X86_DS\n" +
                             "    LDRH R2, [R1]\n" +
                             "    LSLS R2, R2, #4\n" +
@@ -1762,7 +1763,7 @@ public class M33Replacement {
                             "    LDRH R3, [R0]\n" +
                             "    MOV  R1, " + dstReg + "\n" +
                             "    MOV  R2, R3\n" +
-                            "    XORS R3, R3, R1\n" +
+                            "    EORS R3, R3, R1\n" +
                             "    STRH R3, [R0]\n";
                     bytes = 3;
                 } else if (mod == 0b10) {
@@ -1771,7 +1772,7 @@ public class M33Replacement {
                     final int disp16 = (hi << 8) | lo;
                     final int disp16s = (short) disp16;
                     m33candidate = comment + "\n    " + rmExprs[rm] +
-                            String.format("\n    XOR  R0, R0, #%d\n", disp16s) +
+                            String.format("\n    EOR  R0, R0, #%d\n", disp16s) +
                             "    LDR  R1, =X86_DS\n" +
                             "    LDRH R2, [R1]\n" +
                             "    LSLS R2, R2, #4\n" +
@@ -1781,7 +1782,7 @@ public class M33Replacement {
                             "    LDRH R3, [R0]\n" +
                             "    MOV  R1, " + dstReg + "\n" +
                             "    MOV  R2, R3\n" +
-                            "    XORS R3, R3, R1\n" +
+                            "    EORS R3, R3, R1\n" +
                             "    STRH R3, [R0]\n";
                     bytes = 4;
                 } else { // mod == 0b11, регистровый режим
@@ -1790,7 +1791,7 @@ public class M33Replacement {
                             "    MOV  R0, " + srcReg + "\n" +
                             "    MOV  R1, " + dstReg + "\n" +
                             "    MOV  R2, R0\n" +
-                            "    XORS R3, R0, R1\n" +
+                            "    EORS R3, R0, R1\n" +
                             "    MOV  " + dstReg + ", R3\n";
                     bytes = 2;
                 }
@@ -1814,10 +1815,10 @@ public class M33Replacement {
                 final String dstReg = x86Reg16[reg];
 
                 final String[] rmExprs = {
-                        "XOR  R0, R5, R8           // [BX+SI]",
-                        "XOR  R0, R5, R9           // [BX+DI]",
-                        "XOR  R0, R10, R8          // [BP+SI]",
-                        "XOR  R0, R10, R9          // [BP+DI]",
+                        "EOR  R0, R5, R8           // [BX+SI]",
+                        "EOR  R0, R5, R9           // [BX+DI]",
+                        "EOR  R0, R10, R8          // [BP+SI]",
+                        "EOR  R0, R10, R9          // [BP+DI]",
                         "MOV  R0, R8               // [SI]",
                         "MOV  R0, R9               // [DI]",
                         "MOV  R0, R10              // [BP]",
@@ -1837,14 +1838,14 @@ public class M33Replacement {
                             "    LDRH R3, [R0]\n" +
                             "    MOV  R1, " + dstReg + "\n" +
                             "    MOV  R2, R3           // old value\n" +
-                            "    XORS R3, R3, R1       // result in R3, flags auto-updated\n" +
+                            "    EORS R3, R3, R1       // result in R3, flags auto-updated\n" +
                             "    STRH R3, [R0]\n";
                     bytes = 2;
                 } else if (mod == 0b01) {
                     final int disp8 = bin.get(offset + 2);
                     final int disp8s = (byte) disp8;
                     m33candidate = comment + "\n    " + rmExprs[rm] +
-                            String.format("\n    XORS R0, R0, #%d\n", disp8s) +
+                            String.format("\n    EORS R0, R0, #%d\n", disp8s) +
                             "    LDR  R1, =X86_DS\n" +
                             "    LDRH R2, [R1]\n" +
                             "    LSLS R2, R2, #4\n" +
@@ -1854,7 +1855,7 @@ public class M33Replacement {
                             "    LDRH R3, [R0]\n" +
                             "    MOV  R1, " + dstReg + "\n" +
                             "    MOV  R2, R3\n" +
-                            "    XORS R3, R3, R1\n" +
+                            "    EORS R3, R3, R1\n" +
                             "    STRH R3, [R0]\n";
                     bytes = 3;
                 } else if (mod == 0b10) {
@@ -1863,7 +1864,7 @@ public class M33Replacement {
                     final int disp16 = (hi << 8) | lo;
                     final int disp16s = (short) disp16;
                     m33candidate = comment + "\n    " + rmExprs[rm] +
-                            String.format("\n    XOR  R0, R0, #%d\n", disp16s) +
+                            String.format("\n    EOR  R0, R0, #%d\n", disp16s) +
                             "    LDR  R1, =X86_DS\n" +
                             "    LDRH R2, [R1]\n" +
                             "    LSLS R2, R2, #4\n" +
@@ -1873,7 +1874,7 @@ public class M33Replacement {
                             "    LDRH R3, [R0]\n" +
                             "    MOV  R1, " + dstReg + "\n" +
                             "    MOV  R2, R3\n" +
-                            "    XORS R3, R3, R1\n" +
+                            "    EORS R3, R3, R1\n" +
                             "    STRH R3, [R0]\n";
                     bytes = 4;
                 } else { // mod == 0b11, регистровый режим
@@ -1882,7 +1883,7 @@ public class M33Replacement {
                             "    MOV  R0, " + srcReg + "\n" +
                             "    MOV  R1, " + dstReg + "\n" +
                             "    MOV  R2, R0\n" +
-                            "    XORS R3, R0, R1\n" +
+                            "    EORS R3, R0, R1\n" +
                             "    MOV  " + dstReg + ", R3\n";
                     bytes = 2;
                 }
@@ -1903,7 +1904,7 @@ public class M33Replacement {
                                 "    MOV  R0, R4              // 04h %02Xh = XOR AL, (AL = R4)\n" +
                                 "    UXTB R0, R0              // оставляем только младший байт в R0, дальше используется как первый аргумент\n" +
                                 "    LDR  R1, =%d            // загружаем константу в R1, дальше используется, как второй аргумент\n" +
-                                "    XORS R2, R0, R1          // выполняем XOR, в R2 9 бит результата\n" +
+                                "    EORS R2, R0, R1          // выполняем XOR, в R2 9 бит результата\n" +
                                 "    UXTB R4, R2              // результат - только младший байт сохраняем в R4 (AL)",
                         imm8 & 0xFF, imm8
                 );
@@ -1929,7 +1930,7 @@ public class M33Replacement {
                         "    MOV   R0, R4              // 05h %04Xh = XOR AX, 0x%04X (AX = R4 & 0xFFFF)\n" +
                                 "    UXTH  R0, R0              // оставить только 16 бит (AX)\n" +
                                 "    LDR   R1, =%d             // immediate 16-бит\n" +
-                                "    XORS  R2, R0, R1          // R2 = AX + imm16\n" +
+                                "    EORS  R2, R0, R1          // R2 = AX ^ imm16\n" +
                                 "    UXTH  R4, R2              // сохранить только младшие 16 бит (AX) обратно в R4\n",
                         imm16 & 0xFFFF, imm16 & 0xFFFF, imm16
                 );
@@ -2593,13 +2594,16 @@ public class M33Replacement {
                 nextOffset = offset + bytes;
                 pointsTo = nextOffset;
                 m33candidate = String.format(
-                        "    adr  r11, m%08X       // CCh = int3\n" +
+                        "    push {lr}                 // не потерять в INT/IRET\n" +
+                        "    adr  r11, m%08X_IRET  // CCh = int3\n" +
                         "    mrs  r12, apsr            // Сохраняем флаги\n" +
                         "    push {r11, r12}           // Эмулируем PUSH IP, PUSH FLAGS\n" +
                         "    ldr  r11, =0x11000012     // Адрес обработчика INT3h\n" +
                         "    ldr  r11, [r11]           // Адрес обработчика (IDT)\n" +
-                        "    mov  pc, r11              // Переход к обработчику"
-                        , pointsTo
+                        "    mov  pc, r11              // Переход к обработчику\n" +
+                        "m%08X_IRET:\n"+
+                        "    pop  {lr}                 // восстановить после IRET"
+                        , offset, offset
                 );
                 nextOffset = -1; // no direct pass
                 break;
@@ -2610,13 +2614,16 @@ public class M33Replacement {
                 final int b1 = bin.get(offset + 1) & 0xFF;
                 m33candidate = String.format(
                         "    CPSID i                   // Запрет прерываний перед INT\n" +
-                                "    adr  r11, m%08X       // CCh = int %02X\n" +
-                                "    mrs  r12, apsr            // Сохраняем флаги\n" +
-                                "    push {r11, r12}           // Эмулируем PUSH IP, PUSH FLAGS\n" +
-                                "    ldr  r11, =0x%08X     // Адрес обработчика INT %02Xh\n" +
-                                "    ldr  r11, [r11]           // Адрес обработчика (IDT)\n" +
-                                "    mov  pc, r11              // Переход к обработчику"
-                        , pointsTo, b1, 0x11000000 + (b1 << 2), b1
+                        "    push {lr}                 // не потерять в INT/IRET\n" +
+                        "    adr  r11, m%08X_IRET   // CCh = int %02X\n" +
+                        "    mrs  r12, apsr            // Сохраняем флаги\n" +
+                        "    push {r11, r12}           // Эмулируем PUSH IP, PUSH FLAGS\n" +
+                        "    ldr  r11, =0x%08X     // Адрес обработчика INT %02Xh\n" +
+                        "    ldr  r11, [r11]           // Адрес обработчика (IDT)\n" +
+                        "    mov  pc, r11              // Переход к обработчику\n"+
+                        "m%08X_IRET:\n"+
+                        "    pop  {lr}                 // восстановить после IRET"
+                        , offset, b1, 0x11000000 + (b1 * 4), b1, offset
                 );
                 nextOffset = -1; // no direct pass
                 break;
