@@ -1060,9 +1060,9 @@ int main() {
     gprintf(y++, 7, 0, "Video mode: %d (%d columns)", (u8)eax, (u8)(eax >> 8));
     gprintf(y++, 7, 0, "Virtual 2xFDD 4xHDD (images in '/cross' folder)");
 
+    x86_translate_test();
     u32 i = 0;
     while(1) {
-        x86_translate_test();
 //        eax = x86_int16_wrapper(0, 0, 0, 0);
   //      static int i = 0;
     //    u8 ascii = (u8)eax;

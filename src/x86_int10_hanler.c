@@ -483,6 +483,13 @@ inline static u32 x86_int10_hanler_0E(u32 eax, u32 ebx) {
     // Получить позицию курсора из BDA
     u16* BDA = (u16*)X86_FAR_PTR(0x0040, 0x0050);
     u16 edx = BDA[BH];
+    if (AL == 0x0A) {
+        // Сохранить новую позицию курсора
+        BDA[BH] = (DH << 8);
+        text_cursor_row = DH;
+        text_cursor_column = 0;
+        return 0;
+    }
     u16 row = DH;
     u16 column = DL;
 

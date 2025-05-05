@@ -10,9 +10,8 @@ u16 X86_FS = 0;
 u16 X86_GS = 0;
 u16 X86_SS = 0;
 u32 X86_CR0 = 0x00000010; // PE=0, ET=1
-u32 X86_PF = 0;
-u32 X86_CF = 0;
-u32 X86_AF = 0;
+u8 X86_PF = 0;
+u8 X86_AF = 0;
 
 static void ints(void) {
     // init interrupts
